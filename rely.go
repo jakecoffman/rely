@@ -1,10 +1,5 @@
 package rely
 
-import (
-	"fmt"
-	"unsafe"
-)
-
 type Config struct {
 	Name    string
 	Context interface{}
@@ -55,6 +50,8 @@ type SequenceBuffer struct {
 	EntryData []uint8
 }
 
+const available = 0xFFFFFFFF
+
 func NewSequenceBuffer(numEntries, entryStride int, context interface{}) *SequenceBuffer {
 	sb :=  &SequenceBuffer{
 		NumEntries: numEntries,
@@ -80,30 +77,58 @@ func (sb *SequenceBuffer) RemoveEntries(start, finish int) {
 	if finish - start < sb.NumEntries {
 		for sequence := start; sequence <= finish; sequence++ {
 			// cleanup?
-			sb.EntrySequence[sequence%sb.NumEntries] = 0xFFFFFFFF
+			sb.EntrySequence[sequence%sb.NumEntries] = available
 		}
 	} else {
 		for i := 0; i < sb.NumEntries; i++ {
-			sb.EntrySequence[i] = 0xFFFFFFFF
+			sb.EntrySequence[i] = available
 		}
 	}
 }
-
 func (sb *SequenceBuffer) TestInsert(sequence uint16) int {
-	if sb.LessThan(sequence, sb.Sequence - uint16(sb.NumEntries)) {
+	if LessThan(sequence, sb.Sequence - uint16(sb.NumEntries)) {
 		return 0
 	}
 	return 1
 }
-
-func (sb *SequenceBuffer) Insert() {}
+func (sb *SequenceBuffer) Insert(sequence uint16) interface{} {
+	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
+		return nil
+	}
+	if GreaterThan(sequence + 1, sb.Sequence) {
+		sb.RemoveEntries(int(sb.Sequence), int(sequence))
+		sb.Sequence = sequence + 1
+	}
+	index := int(sequence) % sb.NumEntries
+	sb.EntrySequence[index] = uint32(sequence)
+	return sb.EntryData[index*sb.EntryStride]
+}
 func (sb *SequenceBuffer) InsertWithCleanup() {}
-func (sb *SequenceBuffer) Remove() {}
+func (sb *SequenceBuffer) Remove(sequence uint16) {
+	sb.EntrySequence[int(sequence)%sb.NumEntries] = available
+}
 func (sb *SequenceBuffer) RemoveWithCleanup() {}
-func (sb *SequenceBuffer) BufferAvailable() {}
-func (sb *SequenceBuffer) BufferExists() {}
-func (sb *SequenceBuffer) BufferFind() {}
-func (sb *SequenceBuffer) BufferAtIndex() {}
+func (sb *SequenceBuffer) BufferAvailable(sequence uint16) bool {
+	return sb.EntrySequence[int(sequence)] == available
+}
+func (sb *SequenceBuffer) BufferExists(sequence uint16) bool {
+	return sb.EntrySequence[int(sequence)%sb.NumEntries] == uint32(sequence)
+}
+func (sb *SequenceBuffer) BufferFind(sequence uint16) interface{} {
+	index := int(sequence) % sb.NumEntries
+	if sb.EntrySequence[index] == uint32(sequence) {
+		return sb.EntryData[index*sb.EntryStride]
+	} else {
+		return nil
+	}
+}
+func (sb *SequenceBuffer) BufferAtIndex(index int) interface{} {
+	if sb.EntrySequence[index] != available {
+		return sb.EntryData[index*sb.EntryStride]
+	} else {
+		return nil
+	}
+}
 func (sb *SequenceBuffer) BufferGenerateAckBits() {}
 
 type FragmentReassemblyData struct {
@@ -145,3 +170,11 @@ func (e *Endpoint) Bandwidth() {}
 func WritePacketHeader() {}
 func ReadPacketHeader() {}
 func ReadFragmentHeader() {}
+
+func LessThan(s1, s2 uint16) bool {
+	return GreaterThan(s2, s1)
+}
+
+func GreaterThan(s1, s2 uint16) bool {
+	return ( ( s1 > s2 ) && ( s1 - s2 <= 32768 ) ) || ( ( s1 < s2 ) && ( s2 - s1  > 32768 ) )
+}
