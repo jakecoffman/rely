@@ -11,7 +11,7 @@ type SequenceBuffer struct {
 
 const available = 0xFFFFFFFF
 
-func NewSequenceBuffer(numEntries, entryStride int, context interface{}) *SequenceBuffer {
+func NewSequenceBuffer(numEntries, entryStride int) *SequenceBuffer {
 	sb :=  &SequenceBuffer{
 		NumEntries: numEntries,
 		EntryStride: entryStride,
