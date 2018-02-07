@@ -17,7 +17,7 @@ type Config struct {
 	BandwidthSmoothingFactor float64
 	PacketHeaderSize int
 	TransmitPacketFunction func(interface{}, int, uint16, []byte)
-	ProcessPacketFunction func(interface{}, int, uint16, []byte)
+	ProcessPacketFunction func(interface{}, int, uint16, []byte) bool
 	AllocatorContext interface{}
 	AllocateFunction func(interface{}, uint64)
 	FreeFunction func(interface{}, interface{})
