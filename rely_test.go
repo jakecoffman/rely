@@ -129,5 +129,49 @@ func TestAcks(t *testing.T) {
 		dummyPacket := make([]byte, 8)
 
 		context.sender.SendPacket(dummyPacket)
+		context.receiver.SendPacket(dummyPacket)
+
+		context.sender.Update(time)
+		context.receiver.Update(time)
+
+		time += deltaTime
+	}
+
+	senderAckedPacket := make([]uint8, testAcksNumIterations)
+	var senderNumAcks int
+	senderAcks := context.sender.GetAcks(&senderNumAcks)
+	for i := 0; i < senderNumAcks; i++ {
+		if senderAcks[i] < testAcksNumIterations {
+			senderAckedPacket[senderAcks[i]] = 1
+		}
+	}
+	for i := 0; i < testAcksNumIterations / 2; i++ {
+		if senderAckedPacket[i] != 1 {
+			t.Error("Packed not acked", i)
+		}
+	}
+
+	receiverAckedPacket := make([]uint8, testAcksNumIterations)
+	var receiverNumAcks int
+	receiverAcks := context.receiver.GetAcks(&receiverNumAcks)
+	for i := 0; i < receiverNumAcks; i++ {
+		if receiverAcks[i] < testAcksNumIterations {
+			receiverAckedPacket[receiverAcks[i]] = 1
+		}
+	}
+	for i := 0; i < testAcksNumIterations / 2; i++ {
+		if receiverAckedPacket[i] != 1 {
+			t.Error("Packed not acked", i)
+		}
 	}
 }
+
+//func TestAcksPacketLoss(t *testing.T) {
+//	time := 100.0
+//
+//	context := testContext{}
+//	senderConfig := NewDefaultConfig()
+//	receiver := NewDefaultConfig()
+//
+//
+//}

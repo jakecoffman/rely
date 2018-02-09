@@ -70,34 +70,38 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 		// fragment packet
 		packetHeader := NewBuffer(maxPacketHeaderBytes)
 		_ = WritePacketHeader(packetHeader.Buf, sequence, ack, ackBits)
-		var tmp int
+		var extra int
 		if packetBytes % e.Config.FragmentSize != 0 {
-			tmp = 1
+			extra = 1
 		}
-		numFragments := (packetBytes / e.Config.FragmentSize) + tmp
+		numFragments := (packetBytes / e.Config.FragmentSize) + extra
 		log.Debug("[%s] sending packet %d as %d fragments\n", e.Config.Name, sequence, numFragments)
 		fragmentBufferSize := fragmentHeaderBytes + maxPacketHeaderBytes + e.Config.FragmentSize
-		fragmentPacketData := NewBuffer(fragmentBufferSize)
+		fragmentPacketData := make([]byte, fragmentBufferSize)
 
-		// TODO this is all outta wack
-		pos := 0
-		end := len(packetData)
+		q := NewBufferFromRef(packetData)
+		p := NewBufferFromRef(fragmentPacketData)
+
+		// write each fragment with header and data
 		for fragmentId := 0; fragmentId < numFragments; fragmentId++ {
-			fragmentPacketData.WriteUint8(1)
-			fragmentPacketData.WriteUint16(sequence)
-			fragmentPacketData.WriteUint8(uint8(fragmentId))
-			fragmentPacketData.WriteUint8(uint8(numFragments-1))
+			p.Reset()
+			p.WriteUint8(1)
+			p.WriteUint16(sequence)
+			p.WriteUint8(uint8(fragmentId))
+			p.WriteUint8(uint8(numFragments-1))
 
 			if fragmentId == 0 {
-				fragmentPacketData.WriteBytes(packetHeader.Bytes())
+				p.WriteBytes(packetHeader.Bytes())
 			}
 
 			bytesToCopy := e.Config.FragmentSize
-			if pos + bytesToCopy > len(packetData) {
-				bytesToCopy = end - pos
+			if q.Pos + bytesToCopy > len(packetData) {
+				bytesToCopy = len(packetData) - q.Pos
 			}
+			b, _ := q.GetBytes(bytesToCopy)
+			p.WriteBytes(b)
 
-			e.Config.TransmitPacketFunction(e.Config.Context, e.Config.Index, sequence, fragmentPacketData.Bytes())
+			e.Config.TransmitPacketFunction(e.Config.Context, e.Config.Index, sequence, p.Bytes())
 			e.Counters[counterNumFragmentsSent]++
 		}
 		// TODO free(fragmentPacketData)
