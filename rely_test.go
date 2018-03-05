@@ -2,6 +2,8 @@ package rely
 
 import (
 	"testing"
+	l "log"
+	"github.com/op/go-logging"
 )
 
 func TestPacketHeader(t *testing.T) {
@@ -78,14 +80,15 @@ func TestPacketHeader(t *testing.T) {
 }
 
 type testContext struct {
-	drop bool
+	drop int
 	sender, receiver *Endpoint
 }
 
 func testTransmitPacketFunction(context interface{}, index int, sequence uint16, packetData []byte) {
 	ctx := context.(*testContext)
 
-	if ctx.drop {
+	if ctx.drop != 0 {
+		l.Println("DROP")
 		return
 	}
 
@@ -96,13 +99,14 @@ func testTransmitPacketFunction(context interface{}, index int, sequence uint16,
 	}
 }
 
-func processPacketFunction(context interface{}, index int, sequence uint16, packetData []byte) bool {
+func testProcessPacketFunction(context interface{}, index int, sequence uint16, packetData []byte) bool {
 	return true
 }
 
 const testAcksNumIterations = 256
 
 func TestAcks(t *testing.T) {
+	logging.SetLevel(logging.ERROR, "rely")
 	time := 100.0
 
 	var context testContext
@@ -113,12 +117,12 @@ func TestAcks(t *testing.T) {
 	senderConfig.Context = &context
 	senderConfig.Index = 0
 	senderConfig.TransmitPacketFunction = testTransmitPacketFunction
-	senderConfig.ProcessPacketFunction = processPacketFunction
+	senderConfig.ProcessPacketFunction = testProcessPacketFunction
 
 	receiverConfig.Context = &context
 	receiverConfig.Index = 1
 	receiverConfig.TransmitPacketFunction = testTransmitPacketFunction
-	receiverConfig.ProcessPacketFunction = processPacketFunction
+	receiverConfig.ProcessPacketFunction = testProcessPacketFunction
 
 	context.sender = NewEndpoint(senderConfig, time)
 	context.receiver = NewEndpoint(receiverConfig, time)
@@ -126,7 +130,7 @@ func TestAcks(t *testing.T) {
 	deltaTime := 0.01
 
 	for i := 0; i < testAcksNumIterations; i ++ {
-		dummyPacket := make([]byte, 8)
+		dummyPacket := []byte{1, 2, 3, 4, 5, 6, 7, 8,}
 
 		context.sender.SendPacket(dummyPacket)
 		context.receiver.SendPacket(dummyPacket)
@@ -138,40 +142,77 @@ func TestAcks(t *testing.T) {
 	}
 
 	senderAckedPacket := make([]uint8, testAcksNumIterations)
-	var senderNumAcks int
-	senderAcks := context.sender.GetAcks(&senderNumAcks)
-	for i := 0; i < senderNumAcks; i++ {
+	numSenderAcks, senderAcks := context.sender.GetAcks()
+	for i := 0; i < numSenderAcks; i++ {
 		if senderAcks[i] < testAcksNumIterations {
 			senderAckedPacket[senderAcks[i]] = 1
 		}
 	}
 	for i := 0; i < testAcksNumIterations / 2; i++ {
 		if senderAckedPacket[i] != 1 {
-			t.Error("Packed not acked", i)
+			t.Fatal("Packet not acked", i)
 		}
 	}
 
 	receiverAckedPacket := make([]uint8, testAcksNumIterations)
-	var receiverNumAcks int
-	receiverAcks := context.receiver.GetAcks(&receiverNumAcks)
-	for i := 0; i < receiverNumAcks; i++ {
+	numReceiverAcks, receiverAcks := context.receiver.GetAcks()
+	for i := 0; i < numReceiverAcks; i++ {
 		if receiverAcks[i] < testAcksNumIterations {
 			receiverAckedPacket[receiverAcks[i]] = 1
 		}
 	}
 	for i := 0; i < testAcksNumIterations / 2; i++ {
 		if receiverAckedPacket[i] != 1 {
-			t.Error("Packed not acked", i)
+			t.Fatal("Packet not acked", i)
 		}
 	}
 }
 
-//func TestAcksPacketLoss(t *testing.T) {
-//	time := 100.0
-//
-//	context := testContext{}
-//	senderConfig := NewDefaultConfig()
-//	receiver := NewDefaultConfig()
-//
-//
-//}
+func TestAcksPacketLoss(t *testing.T) {
+	time := 100.0
+
+	context := testContext{}
+	senderConfig := NewDefaultConfig()
+	receiverConfig := NewDefaultConfig()
+
+	senderConfig.Context = &context
+	senderConfig.Index = 0
+	senderConfig.TransmitPacketFunction = testTransmitPacketFunction
+	senderConfig.ProcessPacketFunction = testProcessPacketFunction
+
+	receiverConfig.Context = &context
+	receiverConfig.Index = 0
+	receiverConfig.TransmitPacketFunction = testTransmitPacketFunction
+	receiverConfig.ProcessPacketFunction = testProcessPacketFunction
+
+	context.sender = NewEndpoint(senderConfig, time)
+	context.receiver = NewEndpoint(receiverConfig, time)
+
+	deltaTime := 0.1
+	for i := 0; i < testAcksNumIterations; i++ {
+		dummyPacket := make([]uint8, 8)
+
+		context.drop = i % 2
+
+		context.sender.SendPacket(dummyPacket)
+		context.receiver.SendPacket(dummyPacket)
+
+		context.sender.Update(time)
+		context.receiver.Update(time)
+
+		time += deltaTime
+	}
+
+	senderAckedPacket := make([]uint8, testAcksNumIterations)
+	numSenderAcks, senderAcks := context.sender.GetAcks()
+	for i := 0; i < numSenderAcks; i++ {
+		if senderAcks[i] < testAcksNumIterations {
+			senderAckedPacket[senderAcks[i]] = 1
+		}
+	}
+	for i := 0; i < testAcksNumIterations/2; i++ {
+		if senderAckedPacket[i] != uint8((i+1) % 2) {
+			t.Error("Acked packet wrong:", i)
+		}
+	}
+}

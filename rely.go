@@ -60,11 +60,13 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 
 	if packetBytes <= e.Config.FragmentAbove {
 		// regular packet
-		log.Debug("[%s] sending packet %d without fragmentation\n", e.Config.Name, sequence)
+		log.Debugf("[%s] sending packet %d without fragmentation", e.Config.Name, sequence)
 		transmitPacketData := NewBuffer(packetBytes + maxPacketHeaderBytes)
-		_ = WritePacketHeader(transmitPacketData.Buf, sequence, ack, ackBits)
+		transmitPacketData.Pos += WritePacketHeader(transmitPacketData.Buf, sequence, ack, ackBits)
 		transmitPacketData.WriteBytes(packetData)
+		log.Debugf("[%s] transmitting packet %d %v", e.Config.Name, sequence, transmitPacketData.Bytes())
 		e.Config.TransmitPacketFunction(e.Config.Context, e.Config.Index, sequence, transmitPacketData.Bytes())
+		log.Debugf("[%s] done transmitting packet %d", e.Config.Name, sequence)
 		// TODO free(transmitPacketData)
 	} else {
 		// fragment packet
@@ -75,7 +77,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 			extra = 1
 		}
 		numFragments := (packetBytes / e.Config.FragmentSize) + extra
-		log.Debug("[%s] sending packet %d as %d fragments\n", e.Config.Name, sequence, numFragments)
+		log.Debug("[%s] sending packet %d as %d fragments", e.Config.Name, sequence, numFragments)
 		fragmentBufferSize := fragmentHeaderBytes + maxPacketHeaderBytes + e.Config.FragmentSize
 		fragmentPacketData := make([]byte, fragmentBufferSize)
 
@@ -111,7 +113,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 
 func (e *Endpoint) ReceivePacket(packetData []byte) {
 	if len(packetData) > e.Config.MaxPacketSize {
-		log.Errorf("[%s] packet too large to receive. packet is %d bytes, maximum is %d\n", e.Config.Name, len(packetData), e.Config.MaxPacketSize)
+		log.Errorf("[%s] packet too large to receive. packet is %d bytes, maximum is %d", e.Config.Name, len(packetData), e.Config.MaxPacketSize)
 		e.Counters[counterNumPacketsTooLargeToReceive]++
 		return
 	}
@@ -126,30 +128,30 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 
 		packetHeaderBytes := ReadPacketHeader(e.Config.Name, packetData, &sequence, &ack, &ackBits)
 		if packetHeaderBytes < 0 {
-			log.Errorf("[%s] ignoring invalid packet. could not read packet header\n", e.Config.Name)
+			log.Errorf("[%s] ignoring invalid packet. could not read packet header", e.Config.Name)
 			e.Counters[counterNumPacketsInvalid]++
 			return
 		}
 
 		if !e.ReceivedPackets.TestInsert(sequence) {
-			log.Errorf("[%s] ignoring stale packet %d\n", e.Config.Name, sequence)
+			log.Errorf("[%s] ignoring stale packet %d", e.Config.Name, sequence)
 			e.Counters[counterNumPacketsStale]++
 			return
 		}
 
-		log.Debugf("[%s] processing packet %d\n", e.Config.Name, sequence)
+		log.Debugf("[%s] processing packet %d", e.Config.Name, sequence)
 		if e.Config.ProcessPacketFunction(e.Config.Context, e.Config.Index, sequence, packetData[packetHeaderBytes:]) {
-			log.Debugf("[%s] process packet %d successful\n", e.Config.Name, sequence)
+			log.Debugf("[%s] process packet %d successful", e.Config.Name, sequence)
 			receivedPacketData := (*ReceivedPacketData)(unsafe.Pointer(&e.ReceivedPackets.Insert(sequence)[0]))
 			receivedPacketData.Time = e.Time
 			receivedPacketData.PacketBytes = uint32(e.Config.PacketHeaderSize + len(packetData))
 
-			for i:=0; i<32; i++ {
+			for i := 0; i < 32; i++ {
 				if ackBits & 1 != 0 {
 					ackSequence := ack - uint16(i)
 					sentPacketData := (*SentPacketData)(unsafe.Pointer(&e.SentPackets.Find(ackSequence)[0]))
 					if sentPacketData != nil && sentPacketData.Acked != 0 && e.NumAcks < e.Config.AckBufferSize {
-						log.Debugf("[%s] acked packet %d\n", e.Config.Name, sequence)
+						log.Debugf("[%s] acked packet %d", e.Config.Name, sequence)
 						e.Acks[e.NumAcks] = ackSequence
 						e.NumAcks++
 						e.Counters[counterNumPacketsAcked]++
@@ -166,7 +168,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 				ackBits >>= 1
 			}
 		} else {
-			log.Errorf("[%s] process packet failed\n", e.Config.Name)
+			log.Errorf("[%s] process packet failed", e.Config.Name)
 		}
 	} else {
 		// fragment packet
@@ -176,7 +178,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 
 		fragHeaderBytes := ReadFragmentHeader(e.Config.Name, packetData, e.Config.MaxFragments, e.Config.FragmentSize, &fragmentId, &numFragments, &fragmentBytes, &sequence, &ack, &ackBits)
 		if fragHeaderBytes < 0 {
-			log.Errorf("[%s] ignoring invalid fragment. could not read fragment header\n", e.Config.Name)
+			log.Errorf("[%s] ignoring invalid fragment. could not read fragment header", e.Config.Name)
 			e.Counters[counterNumFragmentsInvalid]++
 			return
 		}
@@ -186,7 +188,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 			// TODO withCleanup
 			reassemblyData = (*FragmentReassemblyData)(unsafe.Pointer(&e.FragmentReassembly.Insert(sequence)[0]))
 			if reassemblyData == nil {
-				log.Errorf("[%s] ignoring invalid fragment. could not insert in reassembly buffer (stale)\n", e.Config.Name)
+				log.Errorf("[%s] ignoring invalid fragment. could not insert in reassembly buffer (stale)", e.Config.Name)
 				e.Counters[counterNumFragmentsInvalid]++
 				return
 			}
@@ -202,23 +204,23 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 		}
 
 		if numFragments != int(reassemblyData.NumFragmentsTotal) {
-			log.Errorf("[%s] ignoring invalid fragment. fragment count mismatch. expected %d, got %d\n", e.Config.Name, reassemblyData.NumFragmentsTotal, numFragments)
+			log.Errorf("[%s] ignoring invalid fragment. fragment count mismatch. expected %d, got %d", e.Config.Name, reassemblyData.NumFragmentsTotal, numFragments)
 			e.Counters[counterNumFragmentsInvalid]++
 			return
 		}
 
 		if reassemblyData.FragmentReceived[fragmentId] != 0 {
-			log.Errorf("[%s] ignoring fragment %d of packet %d. fragment already received\n", e.Config.Name, reassemblyData.NumFragmentsTotal, numFragments)
+			log.Errorf("[%s] ignoring fragment %d of packet %d. fragment already received", e.Config.Name, reassemblyData.NumFragmentsTotal, numFragments)
 			return
 		}
 
-		log.Debugf("[%s] received fragment %d of packet %d (%d/%d)\n", e.Config.Name, fragmentId, sequence, reassemblyData.NumFragmentsReceived+1, numFragments)
+		log.Debugf("[%s] received fragment %d of packet %d (%d/%d)", e.Config.Name, fragmentId, sequence, reassemblyData.NumFragmentsReceived+1, numFragments)
 		reassemblyData.NumFragmentsReceived++
 		reassemblyData.FragmentReceived[fragmentId] = 1
 		reassemblyData.StoreFragmentData(sequence, ack, ackBits, fragmentId, e.Config.FragmentSize, packetData[fragHeaderBytes:])
 
 		if reassemblyData.NumFragmentsReceived == reassemblyData.NumFragmentsTotal {
-			log.Debugf("[%s] completed reassembly of packet %d\n", e.Config.Name, sequence)
+			log.Debugf("[%s] completed reassembly of packet %d", e.Config.Name, sequence)
 			e.ReceivePacket(reassemblyData.PacketData[maxPacketHeaderBytes - reassemblyData.PacketHeaderBytes:])
 			e.FragmentReassembly.Remove(sequence) // TODO withcleanup?
 		}
@@ -229,9 +231,8 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 
 func (e *Endpoint) FreePacket() {}
 
-func (e *Endpoint) GetAcks(numAcks *int) []uint16 {
-	*numAcks = e.NumAcks
-	return e.Acks
+func (e *Endpoint) GetAcks() (int, []uint16) {
+	return e.NumAcks, e.Acks
 }
 
 func (e *Endpoint) ClearAcks() {
@@ -261,14 +262,17 @@ func (e *Endpoint) Update(time float64) {
 
 	// calculate packet loss
 	{
-		baseSequence := (int(e.SentPackets.Sequence) - e.Config.SentPacketsBufferSize + 1) + 0xFFFF
+		baseSequence := (e.SentPackets.Sequence - uint16(e.Config.SentPacketsBufferSize) + 1) + 0xFFFF
 		var numDropped int
 		numSamples := e.Config.SentPacketsBufferSize / 2
 		for i := 0; i < numSamples; i++ {
-			sequence := uint16(baseSequence + i)
-			sentPacketData := (*SentPacketData)(unsafe.Pointer(&e.SentPackets.Find(sequence)[0]))
-			if sentPacketData != nil && sentPacketData.Acked == 0 {
-				numDropped++
+			sequence := baseSequence + uint16(i)
+			entry := e.SentPackets.Find(sequence)
+			if entry != nil && len(entry) > 0 {
+				sentPacketData := (*SentPacketData)(unsafe.Pointer(&entry[0]))
+				if sentPacketData != nil && sentPacketData.Acked == 0 {
+					numDropped++
+				}
 			}
 		}
 		packetLoss := float64(numDropped)/float64(numSamples) * 100
@@ -288,10 +292,11 @@ func (e *Endpoint) Update(time float64) {
 		numSamples := e.Config.SentPacketsBufferSize/2
 		for i := 0; i< numSamples; i++ {
 			sequence := uint16(baseSequence + i)
-			sentPacketData := (*SentPacketData)(unsafe.Pointer(&e.SentPackets.Find(sequence)[0]))
-			if sentPacketData == nil {
+			packets := e.SentPackets.Find(sequence)
+			if packets == nil {
 				continue
 			}
+			sentPacketData := (*SentPacketData)(unsafe.Pointer(&packets[0]))
 			bytesSent += int(sentPacketData.PacketBytes)
 			if sentPacketData.Time < startTime {
 				startTime = sentPacketData.Time
@@ -319,10 +324,11 @@ func (e *Endpoint) Update(time float64) {
 		numSamples := e.Config.ReceivedPacketsBufferSize/2
 		for i := 0; i<numSamples; i++ {
 			sequence := uint16(baseSequence + i)
-			receivedPacketData := (*ReceivedPacketData)(unsafe.Pointer(&e.ReceivedPackets.Find(sequence)[0]))
-			if receivedPacketData == nil {
+			packets := e.ReceivedPackets.Find(sequence)
+			if packets == nil {
 				continue
 			}
+			receivedPacketData := (*ReceivedPacketData)(unsafe.Pointer(&packets[0]))
 			bytesSent += int(receivedPacketData.PacketBytes)
 			if receivedPacketData.Time < startTime {
 				startTime = receivedPacketData.Time
@@ -350,8 +356,12 @@ func (e *Endpoint) Update(time float64) {
 		numSamples := e.Config.ReceivedPacketsBufferSize/2
 		for i := 0; i < numSamples; i++ {
 			sequence := uint16(baseSequence + i)
-			sentPacketData := (*SentPacketData)(unsafe.Pointer(&e.SentPackets.Find(sequence)[0]))
-			if sentPacketData == nil || sentPacketData.Acked == 0 {
+			packets := e.SentPackets.Find(sequence)
+			if packets == nil {
+				continue
+			}
+			sentPacketData := (*SentPacketData)(unsafe.Pointer(&packets[0]))
+			if sentPacketData.Acked == 0 {
 				continue
 			}
 			bytesSent += int(sentPacketData.PacketBytes)
@@ -448,21 +458,21 @@ func ReadPacketHeader(name string, packetData []byte, sequence, ack *uint16, ack
 	prefixByte, _ := p.GetUint8()
 
 	if (prefixByte & 1) != 0 {
-		log.Errorf("[%s] prefix byte does not indicate a regular packet\n", name)
+		log.Errorf("[%s] prefix byte does not indicate a regular packet", name)
 		return -1
 	}
 
 	*sequence, _ = p.GetUint16()
 	if prefixByte & (1<<5) != 0 {
 		if packetBytes < 3+1 {
-			log.Errorf("[%s] packet too small for packet header (2)\n", name)
+			log.Errorf("[%s] packet too small for packet header (2)", name)
 			return -1
 		}
 		sequenceDifference, _ := p.GetUint8()
 		*ack = *sequence - uint16(sequenceDifference)
 	} else {
 		if packetBytes < 3 + 2 {
-			log.Errorf("[%s] packet too small for packet header (3)\n", name)
+			log.Errorf("[%s] packet too small for packet header (3)", name)
 			return -1
 		}
 		*ack, _ = p.GetUint16()
@@ -476,7 +486,7 @@ func ReadPacketHeader(name string, packetData []byte, sequence, ack *uint16, ack
 		}
 	}
 	if packetBytes < p.Pos + expectedBytes {
-		log.Errorf("[%s] packet too small for packet header (4)\n", name)
+		log.Errorf("[%s] packet too small for packet header (4)", name)
 		return -1
 	}
 
@@ -509,14 +519,14 @@ func ReadPacketHeader(name string, packetData []byte, sequence, ack *uint16, ack
 func ReadFragmentHeader(name string, packetData []byte, maxFragments, fragmentSize int, fragmentId, numFragments, fragmentBytes *int, sequence, ack *uint16, ackBits *uint32) int {
 	packetBytes := len(packetData)
 	if packetBytes < fragmentHeaderBytes {
-		log.Errorf("[%s] packet is too small to read fragment header\n", name)
+		log.Errorf("[%s] packet is too small to read fragment header", name)
 		return -1
 	}
 
 	p := NewBufferFromRef(packetData)
 	prefixByte, _ := p.GetUint8()
 	if prefixByte != 1 {
-		log.Errorf("[%s] prefix byte is not a fragment\n", name)
+		log.Errorf("[%s] prefix byte is not a fragment", name)
 		return -1
 	}
 
@@ -527,12 +537,12 @@ func ReadFragmentHeader(name string, packetData []byte, maxFragments, fragmentSi
 	*numFragments = int(tmp) + 1
 
 	if *numFragments > maxFragments {
-		log.Errorf("[%s] num fragments %d outside of range of max fragments %d\n", name, *numFragments, maxFragments)
+		log.Errorf("[%s] num fragments %d outside of range of max fragments %d", name, *numFragments, maxFragments)
 		return -1
 	}
 
 	if *fragmentId >= *numFragments {
-		log.Errorf( "[%s] fragment id %d outside of range of num fragments %d\n", name, *fragmentId, *numFragments)
+		log.Errorf( "[%s] fragment id %d outside of range of num fragments %d", name, *fragmentId, *numFragments)
 		return -1
 	}
 
@@ -545,12 +555,12 @@ func ReadFragmentHeader(name string, packetData []byte, maxFragments, fragmentSi
 		packetHeaderBytes := ReadPacketHeader(name, packetData[fragmentHeaderBytes:], &packetSequence, &packetAck, &packetAckBits)
 
 		if packetHeaderBytes < 0 {
-			log.Errorf( "[%s] bad packet header in fragment\n", name)
+			log.Errorf( "[%s] bad packet header in fragment", name)
 			return -1
 		}
 
 		if packetSequence != *sequence {
-			log.Errorf( "[%s] bad packet sequence in fragment. expected %d, got %d\n", name, *sequence, packetSequence)
+			log.Errorf( "[%s] bad packet sequence in fragment. expected %d, got %d", name, *sequence, packetSequence)
 			return -1
 		}
 
@@ -561,12 +571,12 @@ func ReadFragmentHeader(name string, packetData []byte, maxFragments, fragmentSi
 	*ackBits = packetAckBits
 
 	if *fragmentBytes > fragmentSize {
-		log.Errorf( "[%s] fragment bytes %d > fragment size %d\n", name, *fragmentBytes, fragmentSize)
+		log.Errorf( "[%s] fragment bytes %d > fragment size %d", name, *fragmentBytes, fragmentSize)
 		return -1
 	}
 
-	if *fragmentId != *numFragments -1 && *fragmentBytes != fragmentSize {
-		log.Errorf( "[%s] fragment %d is %d bytes, which is not the expected fragment size %d\n", name, *fragmentId, *fragmentBytes, fragmentSize)
+	if *fragmentId != *numFragments - 1 && *fragmentBytes != fragmentSize {
+		log.Errorf( "[%s] fragment %d is %d bytes, which is not the expected fragment size %d", name, *fragmentId, *fragmentBytes, fragmentSize)
 		return -1
 	}
 
