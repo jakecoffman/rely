@@ -5,34 +5,29 @@ import (
 )
 
 // TODO add option for custom allocator, especially to avoid GC
-// TODO make this less generic to avoid unsafe.Pointer calls: implement for each packet type in this package
 
-// SequenceBuffer is a generic store for sent and received packets, as well as fragments of packets.
+// sequenceBuffer is a generic store for sent and received packets, as well as fragments of packets.
 // The entry data is the actual custom packet data that the user is trying to send
-type SequenceBuffer struct {
+type sequenceBuffer struct {
 	Sequence uint16
 	NumEntries int
-	EntryStride int
 	EntrySequence []uint32
-	EntryData []byte
 }
 
 const available = 0xFFFFFFFF
 
-// NewSequenceBuffer creates a sequence buffer with specified entries and stride (size of each packet's data)
-func NewSequenceBuffer(numEntries, entryStride int) *SequenceBuffer {
-	sb :=  &SequenceBuffer{
+// newSequenceBuffer creates a sequence buffer with specified entries and stride (size of each packet's data)
+func newSequenceBuffer(numEntries int) *sequenceBuffer {
+	sb :=  &sequenceBuffer{
 		NumEntries: numEntries,
-		EntryStride: entryStride,
 		EntrySequence: make([]uint32, numEntries),
-		EntryData: make([]byte, numEntries*entryStride),
 	}
 	sb.Reset()
 	return sb
 }
 
 // Reset starts the sequence buffer from scratch
-func (sb *SequenceBuffer) Reset() {
+func (sb *sequenceBuffer) Reset() {
 	sb.Sequence = 0
 	for i := 0; i < sb.NumEntries; i++ {
 		sb.EntrySequence[i] = math.MaxUint32
@@ -40,7 +35,7 @@ func (sb *SequenceBuffer) Reset() {
 }
 
 // RemoveEntries removes old entries from start sequence to finish sequence (inclusive)
-func (sb *SequenceBuffer) RemoveEntries(start, finish int) {
+func (sb *sequenceBuffer) RemoveEntries(start, finish int) {
 	if finish < start {
 		finish += 65535
 	}
@@ -57,71 +52,35 @@ func (sb *SequenceBuffer) RemoveEntries(start, finish int) {
 }
 
 // TestInsert checks to see if the sequence can be inserted
-func (sb *SequenceBuffer) TestInsert(sequence uint16) bool {
+func (sb *sequenceBuffer) TestInsert(sequence uint16) bool {
 	if LessThan(sequence, sb.Sequence - uint16(sb.NumEntries)) {
 		return false
 	}
 	return true
 }
 
-// Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
-func (sb *SequenceBuffer) Insert(sequence uint16) []byte {
-	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
-		// sequence is too low
-		return nil
-	}
-	if GreaterThan(sequence + 1, sb.Sequence) {
-		// move the sequence forward, drop old entries
-		sb.RemoveEntries(int(sb.Sequence), int(sequence))
-		sb.Sequence = sequence + 1
-	}
-	index := int(sequence) % sb.NumEntries
-	sb.EntrySequence[index] = uint32(sequence)
-	return sb.EntryData[index*sb.EntryStride:index*sb.EntryStride+sb.EntryStride]
-}
-
 // TODO
-func (sb *SequenceBuffer) InsertWithCleanup() interface{} {
+func (sb *sequenceBuffer) InsertWithCleanup() interface{} {
 	panic("TODO")
 	return nil
 }
 
-func (sb *SequenceBuffer) Remove(sequence uint16) {
+func (sb *sequenceBuffer) Remove(sequence uint16) {
 	sb.EntrySequence[int(sequence)%sb.NumEntries] = available
 }
 
 // TODO
-func (sb *SequenceBuffer) RemoveWithCleanup() {}
+func (sb *sequenceBuffer) RemoveWithCleanup() {}
 
-func (sb *SequenceBuffer) Available(sequence uint16) bool {
+func (sb *sequenceBuffer) Available(sequence uint16) bool {
 	return sb.EntrySequence[int(sequence)] == available
 }
 
-func (sb *SequenceBuffer) Exists(sequence uint16) bool {
+func (sb *sequenceBuffer) Exists(sequence uint16) bool {
 	return sb.EntrySequence[int(sequence)%sb.NumEntries] == uint32(sequence)
 }
 
-// Find returns the entry data for the sequence, or nil if there is none
-func (sb *SequenceBuffer) Find(sequence uint16) []byte {
-	index := int(sequence) % sb.NumEntries
-	if sb.EntrySequence[index] == uint32(sequence) {
-		location := index*sb.EntryStride
-		return sb.EntryData[location:location+sb.EntryStride]
-	} else {
-		return nil
-	}
-}
-
-func (sb *SequenceBuffer) AtIndex(index int) []byte {
-	if sb.EntrySequence[index] != available {
-		location := index*sb.EntryStride
-		return sb.EntryData[location:location+sb.EntryStride]
-	} else {
-		return nil
-	}
-}
-
-func (sb *SequenceBuffer) GenerateAckBits(ack *uint16, ackBits *uint32) {
+func (sb *sequenceBuffer) GenerateAckBits(ack *uint16, ackBits *uint32) {
 	*ack = sb.Sequence-1
 	*ackBits = 0
 	var mask uint32 = 1
@@ -133,3 +92,143 @@ func (sb *SequenceBuffer) GenerateAckBits(ack *uint16, ackBits *uint32) {
 		mask <<= 1
 	}
 }
+
+
+type SentPacketSequenceBuffer struct {
+	*sequenceBuffer
+	EntryData []SentPacketData
+}
+
+func NewSentPacketSequenceBuffer(numEntries int) *SentPacketSequenceBuffer {
+	return &SentPacketSequenceBuffer{
+		sequenceBuffer: newSequenceBuffer(numEntries),
+		EntryData:      make([]SentPacketData, numEntries),
+	}
+}
+
+// Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
+func (sb *SentPacketSequenceBuffer) Insert(sequence uint16) *SentPacketData {
+	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
+		// sequence is too low
+		return nil
+	}
+	if GreaterThan(sequence + 1, sb.Sequence) {
+		// move the sequence forward, drop old entries
+		sb.RemoveEntries(int(sb.Sequence), int(sequence))
+		sb.Sequence = sequence + 1
+	}
+	index := int(sequence) % sb.NumEntries
+	sb.EntrySequence[index] = uint32(sequence)
+	return &sb.EntryData[index]
+}
+
+// Find returns the entry data for the sequence, or nil if there is none
+func (sb *SentPacketSequenceBuffer) Find(sequence uint16) *SentPacketData {
+	index := int(sequence) % sb.NumEntries
+	if sb.EntrySequence[index] == uint32(sequence) {
+		return &sb.EntryData[index]
+	} else {
+		return nil
+	}
+}
+
+func (sb *SentPacketSequenceBuffer) AtIndex(index int) *SentPacketData {
+	if sb.EntrySequence[index] != available {
+		return &sb.EntryData[index]
+	} else {
+		return nil
+	}
+}
+
+type ReceivedPacketSequenceBuffer struct {
+	*sequenceBuffer
+	EntryData []ReceivedPacketData
+}
+
+func NewReceivedPacketSequenceBuffer(numEntries int) *ReceivedPacketSequenceBuffer {
+	return &ReceivedPacketSequenceBuffer{
+		sequenceBuffer: newSequenceBuffer(numEntries),
+		EntryData:      make([]ReceivedPacketData, numEntries),
+	}
+}
+
+// Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
+func (sb *ReceivedPacketSequenceBuffer) Insert(sequence uint16) *ReceivedPacketData {
+	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
+		// sequence is too low
+		return nil
+	}
+	if GreaterThan(sequence + 1, sb.Sequence) {
+		// move the sequence forward, drop old entries
+		sb.RemoveEntries(int(sb.Sequence), int(sequence))
+		sb.Sequence = sequence + 1
+	}
+	index := int(sequence) % sb.NumEntries
+	sb.EntrySequence[index] = uint32(sequence)
+	return &sb.EntryData[index]
+}
+
+// Find returns the entry data for the sequence, or nil if there is none
+func (sb *ReceivedPacketSequenceBuffer) Find(sequence uint16) *ReceivedPacketData {
+	index := int(sequence) % sb.NumEntries
+	if sb.EntrySequence[index] == uint32(sequence) {
+		return &sb.EntryData[index]
+	} else {
+		return nil
+	}
+}
+
+func (sb *ReceivedPacketSequenceBuffer) AtIndex(index int) *ReceivedPacketData {
+	if sb.EntrySequence[index] != available {
+		return &sb.EntryData[index]
+	} else {
+		return nil
+	}
+}
+
+type FragmentSequenceBuffer struct {
+	*sequenceBuffer
+	EntryData []FragmentReassemblyData
+}
+
+func NewFragmentSequenceBuffer(numEntries int) *FragmentSequenceBuffer {
+	return &FragmentSequenceBuffer{
+		sequenceBuffer: newSequenceBuffer(numEntries),
+		EntryData:      make([]FragmentReassemblyData, numEntries),
+	}
+}
+
+// Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
+func (sb *FragmentSequenceBuffer) Insert(sequence uint16) *FragmentReassemblyData {
+	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
+		// sequence is too low
+		return nil
+	}
+	if GreaterThan(sequence + 1, sb.Sequence) {
+		// move the sequence forward, drop old entries
+		sb.RemoveEntries(int(sb.Sequence), int(sequence))
+		sb.Sequence = sequence + 1
+	}
+	index := int(sequence) % sb.NumEntries
+	sb.EntrySequence[index] = uint32(sequence)
+	return &sb.EntryData[index]
+}
+
+// Find returns the entry data for the sequence, or nil if there is none
+func (sb *FragmentSequenceBuffer) Find(sequence uint16) *FragmentReassemblyData {
+	index := int(sequence) % sb.NumEntries
+	if sb.EntrySequence[index] == uint32(sequence) {
+		return &sb.EntryData[index]
+	} else {
+		return nil
+	}
+}
+
+func (sb *FragmentSequenceBuffer) AtIndex(index int) *FragmentReassemblyData {
+	if sb.EntrySequence[index] != available {
+		return &sb.EntryData[index]
+	} else {
+		return nil
+	}
+}
+

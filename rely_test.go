@@ -2,15 +2,16 @@ package rely
 
 import (
 	"testing"
-	l "log"
 	"github.com/op/go-logging"
 )
 
 func TestPacketHeader(t *testing.T) {
+	logging.SetLevel(logging.ERROR, "rely")
+
 	var writeSequence, writeAck, readSequence, readAck uint16
 	var writeAckBits, readAckBits uint32
 
-	packetData := make([]byte, maxPacketHeaderBytes)
+	packetData := NewBuffer(maxPacketHeaderBytes)
 
 	// worst case, sequence and ack are far apart, no packets acked
 
@@ -23,7 +24,7 @@ func TestPacketHeader(t *testing.T) {
 		t.Error("Should have written", maxPacketHeaderBytes, "but got", bytesWritten)
 	}
 
-	bytesRead := ReadPacketHeader("test_packet_header", packetData, &readSequence, &readAck, &readAckBits)
+	bytesRead := ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
@@ -39,7 +40,7 @@ func TestPacketHeader(t *testing.T) {
 		t.Error(bytesWritten, "!=", 1+2+2+3)
 	}
 
-	bytesRead = ReadPacketHeader("test_packet_header", packetData, &readSequence, &readAck, &readAckBits)
+	bytesRead = ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
@@ -52,11 +53,11 @@ func TestPacketHeader(t *testing.T) {
 
 	bytesWritten = WritePacketHeader(packetData, writeSequence, writeAck, writeAckBits)
 
-	if bytesWritten != 1 + 2 + 1 + 1 {
+	if bytesWritten != 1+2+1+1 {
 		t.Error(bytesWritten, "!=", 1+2+1+1)
 	}
 
-	bytesRead = ReadPacketHeader("test_packet_header", packetData, &readSequence, &readAck, &readAckBits)
+	bytesRead = ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
@@ -69,26 +70,25 @@ func TestPacketHeader(t *testing.T) {
 
 	bytesWritten = WritePacketHeader(packetData, writeSequence, writeAck, writeAckBits)
 
-	if bytesWritten != 1 + 2 + 1 {
+	if bytesWritten != 1+2+1 {
 		t.Error(bytesWritten, "!=", 1+2+1)
 	}
 
-	bytesRead = ReadPacketHeader("test_packet_header", packetData, &readSequence, &readAck, &readAckBits)
+	bytesRead = ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
 }
 
 type testContext struct {
-	drop int
+	drop             int
 	sender, receiver *Endpoint
 }
 
 func testTransmitPacketFunction(context interface{}, index int, sequence uint16, packetData []byte) {
 	ctx := context.(*testContext)
 
-	if ctx.drop != 0 {
-		l.Println("DROP")
+	if ctx.drop > 0 {
 		return
 	}
 
@@ -148,9 +148,9 @@ func TestAcks(t *testing.T) {
 			senderAckedPacket[senderAcks[i]] = 1
 		}
 	}
-	for i := 0; i < testAcksNumIterations / 2; i++ {
+	for i := 0; i < testAcksNumIterations/2; i++ {
 		if senderAckedPacket[i] != 1 {
-			t.Fatal("Packet not acked", i)
+			t.Error("Packet not acked", i)
 		}
 	}
 
@@ -161,7 +161,7 @@ func TestAcks(t *testing.T) {
 			receiverAckedPacket[receiverAcks[i]] = 1
 		}
 	}
-	for i := 0; i < testAcksNumIterations / 2; i++ {
+	for i := 0; i < testAcksNumIterations/2; i++ {
 		if receiverAckedPacket[i] != 1 {
 			t.Fatal("Packet not acked", i)
 		}
@@ -169,11 +169,15 @@ func TestAcks(t *testing.T) {
 }
 
 func TestAcksPacketLoss(t *testing.T) {
+	logging.SetLevel(logging.ERROR, "rely")
+
 	time := 100.0
 
 	context := testContext{}
 	senderConfig := NewDefaultConfig()
+	senderConfig.Name = "Sender"
 	receiverConfig := NewDefaultConfig()
+	receiverConfig.Name = "Receiver"
 
 	senderConfig.Context = &context
 	senderConfig.Index = 0
@@ -181,7 +185,7 @@ func TestAcksPacketLoss(t *testing.T) {
 	senderConfig.ProcessPacketFunction = testProcessPacketFunction
 
 	receiverConfig.Context = &context
-	receiverConfig.Index = 0
+	receiverConfig.Index = 1
 	receiverConfig.TransmitPacketFunction = testTransmitPacketFunction
 	receiverConfig.ProcessPacketFunction = testProcessPacketFunction
 
@@ -190,7 +194,7 @@ func TestAcksPacketLoss(t *testing.T) {
 
 	deltaTime := 0.1
 	for i := 0; i < testAcksNumIterations; i++ {
-		dummyPacket := make([]uint8, 8)
+		dummyPacket := []uint8{1, 2, 3, 4, 5, 6, 7, 8}
 
 		context.drop = i % 2
 
@@ -211,8 +215,116 @@ func TestAcksPacketLoss(t *testing.T) {
 		}
 	}
 	for i := 0; i < testAcksNumIterations/2; i++ {
-		if senderAckedPacket[i] != uint8((i+1) % 2) {
-			t.Error("Acked packet wrong:", i)
+		if senderAckedPacket[i] != uint8((i+1)%2) {
+			t.Fatal("Acked wrong at index", i, "should be", (i+1)%2, "but was", senderAckedPacket[i])
 		}
+	}
+
+	receiverAckedPacket := make([]uint8, testAcksNumIterations)
+	numReceiverAcks, receiverAcks := context.sender.GetAcks()
+	for i := 0; i < numReceiverAcks; i++ {
+		if receiverAcks[i] < testAcksNumIterations {
+			receiverAckedPacket[senderAcks[i]] = 1
+		}
+	}
+	for i := 0; i < testAcksNumIterations/2; i++ {
+		if receiverAckedPacket[i] != uint8((i+1)%2) {
+			t.Fatal("Acked wrong at index", i, "should be", (i+1)%2, "but was", receiverAckedPacket[i])
+		}
+	}
+}
+
+const testMaxPacketBytes = 4 * 1024
+
+func generatePacketData(sequence uint16) []byte {
+	packetBytes := ((int(sequence)*1023) % (testMaxPacketBytes - 2)) + 2
+	if packetBytes < 2 || packetBytes > testMaxPacketBytes {
+		log.Fatal("failed to gen packetBytes", packetBytes)
+	}
+	packetData := make([]byte, packetBytes)
+	packetData[0] = byte(sequence & 0xFF)
+	packetData[1] = byte((sequence >> 8) & 0xFF)
+	for i := 2; i < packetBytes; i++ {
+		packetData[i] = byte((i+int(sequence))%256)
+	}
+	log.Debugf("generated packet of size %v", len(packetData))
+	return packetData
+}
+
+func testProcessPacketFunctionValidate(t *testing.T) func(context interface{}, index int, sequence uint16, packetData []byte) bool {
+	return func(context interface{}, index int, sequence uint16, packetData []byte) bool {
+		if packetData == nil || len(packetData) <= 0 || len(packetData) >= testMaxPacketBytes {
+			t.Fatal("invalid packet data")
+		}
+
+		if len(packetData) < 2 {
+			t.Fatal("invalid packet data size")
+		}
+
+		var seq uint16
+		seq |= uint16(packetData[0])
+		seq |= uint16(packetData[1]) << 8
+		if len(packetData) < ((int(seq)*1023)%(testMaxPacketBytes-2))+2 {
+			t.Fatal("Size not right")
+		}
+		for i := 2; i < len(packetData); i++ {
+			if packetData[i] != byte((i+int(seq))%256) {
+				t.Fatal("Wrong packet data at index", i, "got", packetData[i], "expected", (i+int(seq))%256)
+			}
+		}
+
+		return true
+	}
+}
+
+func TestPackets(t *testing.T) {
+	logging.SetLevel(logging.DEBUG, "rely")
+
+	time := 100.
+
+	context := testContext{}
+	senderConfig := NewDefaultConfig()
+	receiverConfig := NewDefaultConfig()
+
+	senderConfig.FragmentAbove = 500
+	receiverConfig.FragmentAbove = 500
+
+	senderConfig.Context = &context
+	senderConfig.Name = "sender"
+	senderConfig.Index = 0
+	senderConfig.TransmitPacketFunction = testTransmitPacketFunction
+	senderConfig.ProcessPacketFunction = testProcessPacketFunctionValidate(t)
+
+	receiverConfig.Context = &context
+	receiverConfig.Name = "receiver"
+	receiverConfig.Index = 1
+	receiverConfig.TransmitPacketFunction = testTransmitPacketFunction
+	receiverConfig.ProcessPacketFunction = testProcessPacketFunctionValidate(t)
+
+	context.sender = NewEndpoint(senderConfig, time)
+	context.receiver = NewEndpoint(receiverConfig, time)
+
+	deltaTime := 0.1
+
+	for i := 0; i < 16; i++ {
+		{
+			sequence := context.sender.NextPacketSequence()
+			packetData := generatePacketData(sequence)
+			context.sender.SendPacket(packetData)
+		}
+
+		{
+			sequence := context.sender.NextPacketSequence()
+			packetData := generatePacketData(sequence)
+			context.sender.SendPacket(packetData)
+		}
+
+		context.sender.Update(time)
+		context.receiver.Update(time)
+
+		context.sender.ClearAcks()
+		context.receiver.ClearAcks()
+
+		time += deltaTime
 	}
 }

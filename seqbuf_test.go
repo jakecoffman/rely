@@ -2,19 +2,14 @@ package rely
 
 import (
 	"testing"
-	"unsafe"
 )
-
-type testSequenceData struct {
-	sequence uint16
-}
 
 const testSequenceBufferSize = 256
 
 func TestSequenceBuffer_Find(t *testing.T) {
-	sb := NewSequenceBuffer(testSequenceBufferSize, int(unsafe.Sizeof(testSequenceData{})))
-	if sb.Sequence != 0 || sb.NumEntries != testSequenceBufferSize || sb.EntryStride != 2 {
-		t.Error("Failed to construct:", sb.Sequence, sb.NumEntries, sb.EntryStride)
+	sb := NewFragmentSequenceBuffer(testSequenceBufferSize)
+	if sb.Sequence != 0 || sb.NumEntries != testSequenceBufferSize {
+		t.Error("Failed to construct:", sb.Sequence, sb.NumEntries)
 	}
 
 	for i := 0; i < testSequenceBufferSize; i++ {
@@ -25,12 +20,11 @@ func TestSequenceBuffer_Find(t *testing.T) {
 	}
 
 	for i := 0; i <= testSequenceBufferSize*4; i++ {
-		entryBytes := sb.Insert(uint16(i))
-		if entryBytes == nil {
+		entry := sb.Insert(uint16(i))
+		if entry == nil {
 			t.Error("Failed to insert entry")
 		}
-		entry := (*testSequenceData)(unsafe.Pointer(&entryBytes[0]))
-		entry.sequence = uint16(i)
+		entry.Sequence = uint16(i)
 		if int(sb.Sequence) != i+1 {
 			t.Error("Should be", i+1, "but was", sb.Sequence)
 		}
@@ -45,13 +39,12 @@ func TestSequenceBuffer_Find(t *testing.T) {
 
 	index := testSequenceBufferSize * 4
 	for i := 0; i< testSequenceBufferSize; i++ {
-		entryBytes := sb.Find(uint16(index))
-		if entryBytes == nil {
+		entry := sb.Find(uint16(index))
+		if entry == nil {
 			t.Error("Shouldn't have been nil", i)
 		}
-		entry := (*testSequenceData)(unsafe.Pointer(&entryBytes[0]))
-		if entry.sequence != uint16(index) {
-			t.Error("Entry", i, "at index", index, "not equal", entry.sequence)
+		if entry.Sequence != uint16(index) {
+			t.Error("Entry", i, "at index", index, "not equal", entry.Sequence)
 		}
 		index--
 	}
@@ -66,7 +59,7 @@ func TestSequenceBuffer_Find(t *testing.T) {
 }
 
 func TestSequenceBuffer_GenerateAckBits(t *testing.T) {
-	sb := NewSequenceBuffer(testSequenceBufferSize, int(unsafe.Sizeof(testSequenceData{})))
+	sb := NewFragmentSequenceBuffer(testSequenceBufferSize)
 
 	var ack uint16 = 0
 	var ackBits uint32 = 0xFFFFFFFF
