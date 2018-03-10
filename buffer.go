@@ -48,14 +48,15 @@ func (b *Buffer) Len() int {
 	return len(b.Buf)
 }
 
-// Returns the backing byte slice
+// Returns a sub-slice of the bytes written
 func (b *Buffer) Bytes() []byte {
-	return b.Buf
+	return b.Buf[:b.Pos]
 }
 
 // Resets the position back to beginning of buffer
-func (b *Buffer) Reset() {
+func (b *Buffer) Reset() *Buffer {
 	b.Pos = 0
+	return b
 }
 
 // GetByte decodes a little-endian byte

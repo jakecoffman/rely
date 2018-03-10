@@ -18,6 +18,7 @@ type FragmentReassemblyData struct {
 	NumFragmentsReceived int
 	NumFragmentsTotal int
 	PacketData []byte
+	PacketBytes int
 	PacketHeaderBytes int
 	FragmentReceived [256]uint8
 }
@@ -25,19 +26,20 @@ type FragmentReassemblyData struct {
 func (f *FragmentReassemblyData) StoreFragmentData(sequence, ack uint16, ackBits uint32, fragmentId, fragmentSize int, fragmentData []byte) {
 	// if this is the first fragment, write the header and advance the fragmentData cursor
 	if fragmentId == 0 {
-		packetHeader := NewBuffer(maxPacketHeaderBytes)
+		packetHeader := NewBuffer(MaxPacketHeaderBytes)
 		f.PacketHeaderBytes = WritePacketHeader(packetHeader, sequence, ack, ackBits)
-		copy(f.PacketData[maxPacketHeaderBytes-f.PacketHeaderBytes:], packetHeader.Buf)
+		// leaves a gap at the front of the buffer?
+		copy(f.PacketData[MaxPacketHeaderBytes-f.PacketHeaderBytes:], packetHeader.Bytes())
 		fragmentData = fragmentData[f.PacketHeaderBytes:]
 	}
 
 	// if this is the last fragment, we know the final size of the packet
 	if fragmentId == f.NumFragmentsTotal - 1 {
-		// TODO I don't think I need this?!
+		f.PacketBytes = (f.NumFragmentsTotal-1) * fragmentSize + len(fragmentData)
 	}
 
 	// copy the fragment data into the right spot in the array
-	copy(f.PacketData[maxPacketHeaderBytes+fragmentId*fragmentSize:], fragmentData)
+	copy(f.PacketData[MaxPacketHeaderBytes+fragmentId*fragmentSize:], fragmentData)
 }
 
 func (f *FragmentReassemblyData) Cleanup() {}

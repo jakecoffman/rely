@@ -11,7 +11,7 @@ func TestPacketHeader(t *testing.T) {
 	var writeSequence, writeAck, readSequence, readAck uint16
 	var writeAckBits, readAckBits uint32
 
-	packetData := NewBuffer(maxPacketHeaderBytes)
+	packetData := NewBuffer(MaxPacketHeaderBytes)
 
 	// worst case, sequence and ack are far apart, no packets acked
 
@@ -20,8 +20,8 @@ func TestPacketHeader(t *testing.T) {
 	writeAckBits = 0
 
 	bytesWritten := WritePacketHeader(packetData, writeSequence, writeAck, writeAckBits)
-	if bytesWritten != maxPacketHeaderBytes {
-		t.Error("Should have written", maxPacketHeaderBytes, "but got", bytesWritten)
+	if bytesWritten != MaxPacketHeaderBytes {
+		t.Error("Should have written", MaxPacketHeaderBytes, "but got", bytesWritten)
 	}
 
 	bytesRead := ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
@@ -35,7 +35,7 @@ func TestPacketHeader(t *testing.T) {
 	writeAck = 100
 	writeAckBits = 0xFEFEFFFE
 
-	bytesWritten = WritePacketHeader(packetData, writeSequence, writeAck, writeAckBits)
+	bytesWritten = WritePacketHeader(packetData.Reset(), writeSequence, writeAck, writeAckBits)
 	if bytesWritten != 1+2+2+3 {
 		t.Error(bytesWritten, "!=", 1+2+2+3)
 	}
@@ -51,7 +51,7 @@ func TestPacketHeader(t *testing.T) {
 	writeAck = 100
 	writeAckBits = 0xFFFEFFFF
 
-	bytesWritten = WritePacketHeader(packetData, writeSequence, writeAck, writeAckBits)
+	bytesWritten = WritePacketHeader(packetData.Reset(), writeSequence, writeAck, writeAckBits)
 
 	if bytesWritten != 1+2+1+1 {
 		t.Error(bytesWritten, "!=", 1+2+1+1)
@@ -68,7 +68,7 @@ func TestPacketHeader(t *testing.T) {
 	writeAck = 100
 	writeAckBits = 0xFFFFFFFF
 
-	bytesWritten = WritePacketHeader(packetData, writeSequence, writeAck, writeAckBits)
+	bytesWritten = WritePacketHeader(packetData.Reset(), writeSequence, writeAck, writeAckBits)
 
 	if bytesWritten != 1+2+1 {
 		t.Error(bytesWritten, "!=", 1+2+1)
@@ -247,7 +247,6 @@ func generatePacketData(sequence uint16) []byte {
 	for i := 2; i < packetBytes; i++ {
 		packetData[i] = byte((i+int(sequence))%256)
 	}
-	log.Debugf("generated packet of size %v", len(packetData))
 	return packetData
 }
 
@@ -265,7 +264,7 @@ func testProcessPacketFunctionValidate(t *testing.T) func(context interface{}, i
 		seq |= uint16(packetData[0])
 		seq |= uint16(packetData[1]) << 8
 		if len(packetData) < ((int(seq)*1023)%(testMaxPacketBytes-2))+2 {
-			t.Fatal("Size not right")
+			t.Fatal("Size not right, expected", ((int(seq)*1023)%(testMaxPacketBytes-2))+2, " got ", len(packetData))
 		}
 		for i := 2; i < len(packetData); i++ {
 			if packetData[i] != byte((i+int(seq))%256) {
@@ -278,7 +277,7 @@ func testProcessPacketFunctionValidate(t *testing.T) func(context interface{}, i
 }
 
 func TestPackets(t *testing.T) {
-	logging.SetLevel(logging.DEBUG, "rely")
+	//logging.SetLevel(logging.DEBUG, "rely")
 
 	time := 100.
 
