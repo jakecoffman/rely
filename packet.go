@@ -26,10 +26,10 @@ type FragmentReassemblyData struct {
 func (f *FragmentReassemblyData) StoreFragmentData(sequence, ack uint16, ackBits uint32, fragmentId, fragmentSize int, fragmentData []byte) {
 	// if this is the first fragment, write the header and advance the fragmentData cursor
 	if fragmentId == 0 {
-		packetHeader := NewBuffer(MaxPacketHeaderBytes)
+		packetHeader := newBuffer(MaxPacketHeaderBytes)
 		f.PacketHeaderBytes = WritePacketHeader(packetHeader, sequence, ack, ackBits)
 		// leaves a gap at the front of the buffer?
-		copy(f.PacketData[MaxPacketHeaderBytes-f.PacketHeaderBytes:], packetHeader.Bytes())
+		copy(f.PacketData[MaxPacketHeaderBytes-f.PacketHeaderBytes:], packetHeader.bytes())
 		fragmentData = fragmentData[f.PacketHeaderBytes:]
 	}
 

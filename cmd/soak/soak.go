@@ -24,11 +24,13 @@ var globalContext = testContext{}
 // to profile, run `./soak -cpuprofile=prof -iterations=8000`, then run `go tool pprof soak profile`
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var iterations = flag.Int("iterations", -1, "number of iterations to run")
+var loglevel = flag.Int("loglevel", int(logging.ERROR), "log level (5 for debug)")
 
 func main() {
-	logging.SetLevel(logging.ERROR, "rely")
-
 	flag.Parse()
+
+	logging.SetLevel(logging.Level(*loglevel), "rely")
+
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
 		if err != nil {

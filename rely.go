@@ -60,14 +60,14 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 	if packetBytes <= e.Config.FragmentAbove {
 		// regular packet
 		log.Debugf("[%s] sending packet %d without fragmentation", e.Config.Name, sequence)
-		transmitPacketData := NewBuffer(packetBytes + MaxPacketHeaderBytes)
+		transmitPacketData := newBuffer(packetBytes + MaxPacketHeaderBytes)
 		_ = WritePacketHeader(transmitPacketData, sequence, ack, ackBits)
-		transmitPacketData.WriteBytes(packetData)
-		e.Config.TransmitPacketFunction(e.Config.Context, e.Config.Index, sequence, transmitPacketData.Bytes())
+		transmitPacketData.writeBytes(packetData)
+		e.Config.TransmitPacketFunction(e.Config.Context, e.Config.Index, sequence, transmitPacketData.bytes())
 		// TODO free(transmitPacketData)
 	} else {
 		// fragment packet
-		packetHeader := NewBuffer(MaxPacketHeaderBytes)
+		packetHeader := newBuffer(MaxPacketHeaderBytes)
 		_ = WritePacketHeader(packetHeader, sequence, ack, ackBits)
 		var extra int
 		if packetBytes % e.Config.FragmentSize != 0 {
@@ -77,29 +77,29 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 		log.Debugf("[%s] sending packet %d as %d fragments", e.Config.Name, sequence, numFragments)
 		fragmentBufferSize := FragmentHeaderBytes + MaxPacketHeaderBytes + e.Config.FragmentSize
 
-		q := NewBufferFromRef(packetData)
-		p := NewBuffer(fragmentBufferSize)
+		q := newBufferFromRef(packetData)
+		p := newBuffer(fragmentBufferSize)
 
 		// write each fragment with header and data
 		for fragmentId := 0; fragmentId < numFragments; fragmentId++ {
-			p.Reset()
-			p.WriteUint8(1)
-			p.WriteUint16(sequence)
-			p.WriteUint8(uint8(fragmentId))
-			p.WriteUint8(uint8(numFragments-1))
+			p.reset()
+			p.writeUint8(1)
+			p.writeUint16(sequence)
+			p.writeUint8(uint8(fragmentId))
+			p.writeUint8(uint8(numFragments-1))
 
 			if fragmentId == 0 {
-				p.WriteBytes(packetHeader.Bytes())
+				p.writeBytes(packetHeader.bytes())
 			}
 
 			bytesToCopy := e.Config.FragmentSize
-			if q.Pos + bytesToCopy > len(packetData) {
-				bytesToCopy = len(packetData) - q.Pos
+			if q.pos+ bytesToCopy > len(packetData) {
+				bytesToCopy = len(packetData) - q.pos
 			}
-			b, _ := q.GetBytes(bytesToCopy)
-			p.WriteBytes(b)
+			b, _ := q.getBytes(bytesToCopy)
+			p.writeBytes(b)
 
-			e.Config.TransmitPacketFunction(e.Config.Context, e.Config.Index, sequence, p.Bytes())
+			e.Config.TransmitPacketFunction(e.Config.Context, e.Config.Index, sequence, p.bytes())
 			e.Counters[CounterNumFragmentsSent]++
 		}
 		// TODO free(fragmentPacketData)
@@ -380,7 +380,7 @@ func (e *Endpoint) Bandwidth() (float64, float64, float64) {
 	return e.SentBandwidthKbps, e.ReceivedBandwidthKbps, e.AckedBandwidthKbps
 }
 
-func WritePacketHeader(packetData *Buffer, sequence, ack uint16, ackBits uint32) int {
+func WritePacketHeader(packetData *buffer, sequence, ack uint16, ackBits uint32) int {
 	var prefixByte uint8
 
 	if (ackBits & 0x000000FF) != 0x000000FF {
@@ -407,29 +407,29 @@ func WritePacketHeader(packetData *Buffer, sequence, ack uint16, ackBits uint32)
 		prefixByte |= 1<<5
 	}
 
-	packetData.WriteUint8(prefixByte)
-	packetData.WriteUint16(sequence)
+	packetData.writeUint8(prefixByte)
+	packetData.writeUint16(sequence)
 
 	if seqDiff <= 255 {
-		packetData.WriteUint8(uint8(seqDiff))
+		packetData.writeUint8(uint8(seqDiff))
 	} else {
-		packetData.WriteUint16(ack)
+		packetData.writeUint16(ack)
 	}
 
 	if (ackBits & 0x000000FF) != 0x000000FF {
-		packetData.WriteUint8(uint8(ackBits & 0x000000FF))
+		packetData.writeUint8(uint8(ackBits & 0x000000FF))
 	}
 	if (ackBits & 0x0000FF00) != 0x0000FF00 {
-		packetData.WriteUint8(uint8(ackBits & 0x000000FF >> 8))
+		packetData.writeUint8(uint8(ackBits & 0x000000FF >> 8))
 	}
 	if (ackBits & 0x00FF0000) != 0x00FF0000 {
-		packetData.WriteUint8(uint8(ackBits & 0x00FF0000 >> 16))
+		packetData.writeUint8(uint8(ackBits & 0x00FF0000 >> 16))
 	}
 	if (ackBits & 0xFF000000) != 0xFF000000 {
-		packetData.WriteUint8(uint8(ackBits & 0xFF000000 >> 24))
+		packetData.writeUint8(uint8(ackBits & 0xFF000000 >> 24))
 	}
 
-	return packetData.Pos
+	return packetData.pos
 }
 
 func ReadPacketHeader(name string, packetData []byte, sequence, ack *uint16, ackBits *uint32) int {
@@ -437,29 +437,29 @@ func ReadPacketHeader(name string, packetData []byte, sequence, ack *uint16, ack
 	if packetBytes < 3 {
 		return -1
 	}
-	p := NewBufferFromRef(packetData)
+	p := newBufferFromRef(packetData)
 
-	prefixByte, _ := p.GetUint8()
+	prefixByte, _ := p.getUint8()
 
 	if (prefixByte & 1) != 0 {
 		log.Errorf("[%s] prefix byte does not indicate a regular packet", name)
 		return -1
 	}
 
-	*sequence, _ = p.GetUint16()
+	*sequence, _ = p.getUint16()
 	if prefixByte & (1<<5) != 0 {
 		if packetBytes < 3+1 {
 			log.Errorf("[%s] packet too small for packet header (2)", name)
 			return -1
 		}
-		sequenceDifference, _ := p.GetUint8()
+		sequenceDifference, _ := p.getUint8()
 		*ack = *sequence - uint16(sequenceDifference)
 	} else {
 		if packetBytes < 3 + 2 {
 			log.Errorf("[%s] packet too small for packet header (3)", name)
 			return -1
 		}
-		*ack, _ = p.GetUint16()
+		*ack, _ = p.getUint16()
 	}
 
 	var expectedBytes int
@@ -469,7 +469,7 @@ func ReadPacketHeader(name string, packetData []byte, sequence, ack *uint16, ack
 			expectedBytes++
 		}
 	}
-	if packetBytes < p.Pos + expectedBytes {
+	if packetBytes < p.pos+ expectedBytes {
 		log.Errorf("[%s] packet too small for packet header (4)", name)
 		return -1
 	}
@@ -477,26 +477,26 @@ func ReadPacketHeader(name string, packetData []byte, sequence, ack *uint16, ack
 	*ackBits = 0xFFFFFFFF
 	if prefixByte & (1<<1) != 0 {
 		*ackBits &= 0xFFFFFF00
-		b, _ := p.GetUint8()
+		b, _ := p.getUint8()
 		*ackBits |= uint32(b)
 	}
 	if prefixByte & (1<<2) != 0 {
 		*ackBits &= 0xFFFF00FF
-		b, _ := p.GetUint8()
+		b, _ := p.getUint8()
 		*ackBits |= uint32(b) << 8
 	}
 	if prefixByte & (1<<3) != 0 {
 		*ackBits &= 0xFF00FFFF
-		b, _ := p.GetUint8()
+		b, _ := p.getUint8()
 		*ackBits |= uint32(b) << 16
 	}
 	if prefixByte & (1<<4) != 0 {
 		*ackBits &= 0x00FFFFFF
-		b, _ := p.GetUint8()
+		b, _ := p.getUint8()
 		*ackBits |= uint32(b) << 24
 	}
 
-	return p.Pos
+	return p.pos
 }
 
 func ReadFragmentHeader(name string, packetData []byte, maxFragments, fragmentSize int, fragmentId, numFragments, fragmentBytes *int, sequence, ack *uint16, ackBits *uint32) int {
@@ -506,17 +506,17 @@ func ReadFragmentHeader(name string, packetData []byte, maxFragments, fragmentSi
 		return -1
 	}
 
-	p := NewBufferFromRef(packetData)
-	prefixByte, _ := p.GetUint8()
+	p := newBufferFromRef(packetData)
+	prefixByte, _ := p.getUint8()
 	if prefixByte != 1 {
 		log.Errorf("[%s] prefix byte is not a fragment", name)
 		return -1
 	}
 
-	*sequence, _ = p.GetUint16()
-	tmp, _ := p.GetUint8()
+	*sequence, _ = p.getUint16()
+	tmp, _ := p.getUint8()
 	*fragmentId = int(tmp)
-	tmp, _ = p.GetUint8()
+	tmp, _ = p.getUint8()
 	*numFragments = int(tmp) + 1
 
 	if *numFragments > maxFragments {
@@ -563,7 +563,7 @@ func ReadFragmentHeader(name string, packetData []byte, maxFragments, fragmentSi
 		return -1
 	}
 
-	return p.Pos
+	return p.pos
 }
 
 func LessThan(s1, s2 uint16) bool {

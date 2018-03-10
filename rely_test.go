@@ -11,7 +11,7 @@ func TestPacketHeader(t *testing.T) {
 	var writeSequence, writeAck, readSequence, readAck uint16
 	var writeAckBits, readAckBits uint32
 
-	packetData := NewBuffer(MaxPacketHeaderBytes)
+	packetData := newBuffer(MaxPacketHeaderBytes)
 
 	// worst case, sequence and ack are far apart, no packets acked
 
@@ -24,7 +24,7 @@ func TestPacketHeader(t *testing.T) {
 		t.Error("Should have written", MaxPacketHeaderBytes, "but got", bytesWritten)
 	}
 
-	bytesRead := ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
+	bytesRead := ReadPacketHeader("test_packet_header", packetData.buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
@@ -35,12 +35,12 @@ func TestPacketHeader(t *testing.T) {
 	writeAck = 100
 	writeAckBits = 0xFEFEFFFE
 
-	bytesWritten = WritePacketHeader(packetData.Reset(), writeSequence, writeAck, writeAckBits)
+	bytesWritten = WritePacketHeader(packetData.reset(), writeSequence, writeAck, writeAckBits)
 	if bytesWritten != 1+2+2+3 {
 		t.Error(bytesWritten, "!=", 1+2+2+3)
 	}
 
-	bytesRead = ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
+	bytesRead = ReadPacketHeader("test_packet_header", packetData.buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
@@ -51,13 +51,13 @@ func TestPacketHeader(t *testing.T) {
 	writeAck = 100
 	writeAckBits = 0xFFFEFFFF
 
-	bytesWritten = WritePacketHeader(packetData.Reset(), writeSequence, writeAck, writeAckBits)
+	bytesWritten = WritePacketHeader(packetData.reset(), writeSequence, writeAck, writeAckBits)
 
 	if bytesWritten != 1+2+1+1 {
 		t.Error(bytesWritten, "!=", 1+2+1+1)
 	}
 
-	bytesRead = ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
+	bytesRead = ReadPacketHeader("test_packet_header", packetData.buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
@@ -68,13 +68,13 @@ func TestPacketHeader(t *testing.T) {
 	writeAck = 100
 	writeAckBits = 0xFFFFFFFF
 
-	bytesWritten = WritePacketHeader(packetData.Reset(), writeSequence, writeAck, writeAckBits)
+	bytesWritten = WritePacketHeader(packetData.reset(), writeSequence, writeAck, writeAckBits)
 
 	if bytesWritten != 1+2+1 {
 		t.Error(bytesWritten, "!=", 1+2+1)
 	}
 
-	bytesRead = ReadPacketHeader("test_packet_header", packetData.Buf, &readSequence, &readAck, &readAckBits)
+	bytesRead = ReadPacketHeader("test_packet_header", packetData.buf, &readSequence, &readAck, &readAckBits)
 	if bytesRead != bytesWritten || readSequence != writeSequence || readAck != writeAck || readAckBits != writeAckBits {
 		t.Error("read != write", bytesRead, bytesWritten, readSequence, writeSequence, readAck, writeAck, readAckBits, writeAckBits)
 	}
