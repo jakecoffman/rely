@@ -18,9 +18,9 @@ type Endpoint struct {
 	NumAcks               int
 	Acks                  []uint16
 	Sequence              uint16
-	SentPackets           *SentPacketSequenceBuffer
-	ReceivedPackets       *ReceivedPacketSequenceBuffer
-	FragmentReassembly    *FragmentSequenceBuffer
+	SentPackets           *sentPacketSequenceBuffer
+	ReceivedPackets       *receivedPacketSequenceBuffer
+	FragmentReassembly    *fragmentSequenceBuffer
 	Counters              [CounterMax]uint64
 }
 
@@ -28,9 +28,9 @@ func NewEndpoint(config *Config, time float64) *Endpoint {
 	return &Endpoint{
 		Config:             config,
 		Time:               time,
-		SentPackets:        NewSentPacketSequenceBuffer(config.SentPacketsBufferSize),
-		ReceivedPackets:    NewReceivedPacketSequenceBuffer(config.ReceivedPacketsBufferSize),
-		FragmentReassembly: NewFragmentSequenceBuffer(config.FragmentReassemblyBufferSize),
+		SentPackets:        newSentPacketSequenceBuffer(config.SentPacketsBufferSize),
+		ReceivedPackets:    newReceivedPacketSequenceBuffer(config.ReceivedPacketsBufferSize),
+		FragmentReassembly: newFragmentSequenceBuffer(config.FragmentReassemblyBufferSize),
 		Acks:               make([]uint16, config.AckBufferSize),
 	}
 }

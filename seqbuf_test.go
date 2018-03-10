@@ -7,7 +7,7 @@ import (
 const testSequenceBufferSize = 256
 
 func TestSequenceBuffer_Find(t *testing.T) {
-	sb := NewFragmentSequenceBuffer(testSequenceBufferSize)
+	sb := newFragmentSequenceBuffer(testSequenceBufferSize)
 	if sb.Sequence != 0 || sb.NumEntries != testSequenceBufferSize {
 		t.Error("Failed to construct:", sb.Sequence, sb.NumEntries)
 	}
@@ -59,7 +59,7 @@ func TestSequenceBuffer_Find(t *testing.T) {
 }
 
 func TestSequenceBuffer_GenerateAckBits(t *testing.T) {
-	sb := NewFragmentSequenceBuffer(testSequenceBufferSize)
+	sb := newFragmentSequenceBuffer(testSequenceBufferSize)
 
 	var ack uint16 = 0
 	var ackBits uint32 = 0xFFFFFFFF

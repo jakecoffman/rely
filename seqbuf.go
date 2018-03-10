@@ -94,20 +94,20 @@ func (sb *sequenceBuffer) GenerateAckBits(ack *uint16, ackBits *uint32) {
 }
 
 
-type SentPacketSequenceBuffer struct {
+type sentPacketSequenceBuffer struct {
 	*sequenceBuffer
 	EntryData []SentPacketData
 }
 
-func NewSentPacketSequenceBuffer(numEntries int) *SentPacketSequenceBuffer {
-	return &SentPacketSequenceBuffer{
+func newSentPacketSequenceBuffer(numEntries int) *sentPacketSequenceBuffer {
+	return &sentPacketSequenceBuffer{
 		sequenceBuffer: newSequenceBuffer(numEntries),
 		EntryData:      make([]SentPacketData, numEntries),
 	}
 }
 
 // Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
-func (sb *SentPacketSequenceBuffer) Insert(sequence uint16) *SentPacketData {
+func (sb *sentPacketSequenceBuffer) Insert(sequence uint16) *SentPacketData {
 	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
 		// sequence is too low
 		return nil
@@ -123,7 +123,7 @@ func (sb *SentPacketSequenceBuffer) Insert(sequence uint16) *SentPacketData {
 }
 
 // Find returns the entry data for the sequence, or nil if there is none
-func (sb *SentPacketSequenceBuffer) Find(sequence uint16) *SentPacketData {
+func (sb *sentPacketSequenceBuffer) Find(sequence uint16) *SentPacketData {
 	index := int(sequence) % sb.NumEntries
 	if sb.EntrySequence[index] == uint32(sequence) {
 		return &sb.EntryData[index]
@@ -132,7 +132,7 @@ func (sb *SentPacketSequenceBuffer) Find(sequence uint16) *SentPacketData {
 	}
 }
 
-func (sb *SentPacketSequenceBuffer) AtIndex(index int) *SentPacketData {
+func (sb *sentPacketSequenceBuffer) AtIndex(index int) *SentPacketData {
 	if sb.EntrySequence[index] != available {
 		return &sb.EntryData[index]
 	} else {
@@ -140,20 +140,20 @@ func (sb *SentPacketSequenceBuffer) AtIndex(index int) *SentPacketData {
 	}
 }
 
-type ReceivedPacketSequenceBuffer struct {
+type receivedPacketSequenceBuffer struct {
 	*sequenceBuffer
 	EntryData []ReceivedPacketData
 }
 
-func NewReceivedPacketSequenceBuffer(numEntries int) *ReceivedPacketSequenceBuffer {
-	return &ReceivedPacketSequenceBuffer{
+func newReceivedPacketSequenceBuffer(numEntries int) *receivedPacketSequenceBuffer {
+	return &receivedPacketSequenceBuffer{
 		sequenceBuffer: newSequenceBuffer(numEntries),
 		EntryData:      make([]ReceivedPacketData, numEntries),
 	}
 }
 
 // Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
-func (sb *ReceivedPacketSequenceBuffer) Insert(sequence uint16) *ReceivedPacketData {
+func (sb *receivedPacketSequenceBuffer) Insert(sequence uint16) *ReceivedPacketData {
 	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
 		// sequence is too low
 		return nil
@@ -169,7 +169,7 @@ func (sb *ReceivedPacketSequenceBuffer) Insert(sequence uint16) *ReceivedPacketD
 }
 
 // Find returns the entry data for the sequence, or nil if there is none
-func (sb *ReceivedPacketSequenceBuffer) Find(sequence uint16) *ReceivedPacketData {
+func (sb *receivedPacketSequenceBuffer) Find(sequence uint16) *ReceivedPacketData {
 	index := int(sequence) % sb.NumEntries
 	if sb.EntrySequence[index] == uint32(sequence) {
 		return &sb.EntryData[index]
@@ -178,7 +178,7 @@ func (sb *ReceivedPacketSequenceBuffer) Find(sequence uint16) *ReceivedPacketDat
 	}
 }
 
-func (sb *ReceivedPacketSequenceBuffer) AtIndex(index int) *ReceivedPacketData {
+func (sb *receivedPacketSequenceBuffer) AtIndex(index int) *ReceivedPacketData {
 	if sb.EntrySequence[index] != available {
 		return &sb.EntryData[index]
 	} else {
@@ -186,20 +186,20 @@ func (sb *ReceivedPacketSequenceBuffer) AtIndex(index int) *ReceivedPacketData {
 	}
 }
 
-type FragmentSequenceBuffer struct {
+type fragmentSequenceBuffer struct {
 	*sequenceBuffer
 	EntryData []FragmentReassemblyData
 }
 
-func NewFragmentSequenceBuffer(numEntries int) *FragmentSequenceBuffer {
-	return &FragmentSequenceBuffer{
+func newFragmentSequenceBuffer(numEntries int) *fragmentSequenceBuffer {
+	return &fragmentSequenceBuffer{
 		sequenceBuffer: newSequenceBuffer(numEntries),
 		EntryData:      make([]FragmentReassemblyData, numEntries),
 	}
 }
 
 // Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
-func (sb *FragmentSequenceBuffer) Insert(sequence uint16) *FragmentReassemblyData {
+func (sb *fragmentSequenceBuffer) Insert(sequence uint16) *FragmentReassemblyData {
 	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
 		// sequence is too low
 		return nil
@@ -215,7 +215,7 @@ func (sb *FragmentSequenceBuffer) Insert(sequence uint16) *FragmentReassemblyDat
 }
 
 // Find returns the entry data for the sequence, or nil if there is none
-func (sb *FragmentSequenceBuffer) Find(sequence uint16) *FragmentReassemblyData {
+func (sb *fragmentSequenceBuffer) Find(sequence uint16) *FragmentReassemblyData {
 	index := int(sequence) % sb.NumEntries
 	if sb.EntrySequence[index] == uint32(sequence) {
 		return &sb.EntryData[index]
@@ -224,7 +224,7 @@ func (sb *FragmentSequenceBuffer) Find(sequence uint16) *FragmentReassemblyData 
 	}
 }
 
-func (sb *FragmentSequenceBuffer) AtIndex(index int) *FragmentReassemblyData {
+func (sb *fragmentSequenceBuffer) AtIndex(index int) *FragmentReassemblyData {
 	if sb.EntrySequence[index] != available {
 		return &sb.EntryData[index]
 	} else {
