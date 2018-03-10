@@ -17,7 +17,9 @@ type Config struct {
 	PacketLossSmoothingFactor    float64
 	BandwidthSmoothingFactor     float64
 	PacketHeaderSize             int
+	// TransmitPacketFunction is called by SendPacket to do the actual transmitting of packets
 	TransmitPacketFunction       func(interface{}, int, uint16, []byte)
+	// ProcessPacketFunction is called by ReceivePacket once a fully assembled packet is received
 	ProcessPacketFunction        func(interface{}, int, uint16, []byte) bool
 }
 

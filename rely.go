@@ -1,3 +1,4 @@
+// This is a port of reliable.io to Go. See also https://gafferongames.com/post/reliable_ordered_messages/
 package rely
 
 import (
