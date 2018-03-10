@@ -1,17 +1,17 @@
 package rely
 
-type SentPacketData struct {
+type sentPacketData struct {
 	Time float64
 	Acked uint32 // use only 1 bit
 	PacketBytes uint32 // use only 31 bits
 }
 
-type ReceivedPacketData struct {
+type receivedPacketData struct {
 	Time float64
 	PacketBytes uint32
 }
 
-type FragmentReassemblyData struct {
+type fragmentReassemblyData struct {
 	Sequence uint16
 	Ack uint16
 	AckBits uint32
@@ -23,7 +23,7 @@ type FragmentReassemblyData struct {
 	FragmentReceived [256]uint8
 }
 
-func (f *FragmentReassemblyData) StoreFragmentData(sequence, ack uint16, ackBits uint32, fragmentId, fragmentSize int, fragmentData []byte) {
+func (f *fragmentReassemblyData) StoreFragmentData(sequence, ack uint16, ackBits uint32, fragmentId, fragmentSize int, fragmentData []byte) {
 	// if this is the first fragment, write the header and advance the fragmentData cursor
 	if fragmentId == 0 {
 		packetHeader := newBuffer(MaxPacketHeaderBytes)
@@ -42,4 +42,4 @@ func (f *FragmentReassemblyData) StoreFragmentData(sequence, ack uint16, ackBits
 	copy(f.PacketData[MaxPacketHeaderBytes+fragmentId*fragmentSize:], fragmentData)
 }
 
-func (f *FragmentReassemblyData) Cleanup() {}
+func (f *fragmentReassemblyData) Cleanup() {}
