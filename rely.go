@@ -7,6 +7,7 @@ import (
 
 var log = logging.MustGetLogger("rely")
 
+// Endpoint is a reliable udp endpoint
 type Endpoint struct {
 	config                *Config
 	time                  float64
@@ -24,6 +25,7 @@ type Endpoint struct {
 	counters              [counterMax]uint64
 }
 
+// NewEndpoint creates an endpoint
 func NewEndpoint(config *Config, time float64) *Endpoint {
 	return &Endpoint{
 		config:             config,
@@ -35,10 +37,12 @@ func NewEndpoint(config *Config, time float64) *Endpoint {
 	}
 }
 
+// NextPacketSequence returns the next packet sequence that will be used
 func (e *Endpoint) NextPacketSequence() uint16 {
 	return e.sequence
 }
 
+// SendPacket reliably sends one or more packets with the passed
 func (e *Endpoint) SendPacket(packetData []byte) {
 	packetBytes := len(packetData)
 	if packetBytes > e.config.MaxPacketSize {
@@ -107,6 +111,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 	e.counters[counterNumPacketsSent]++
 }
 
+// ReceivePacket reliably receives a packet of data sent by SendPacket
 func (e *Endpoint) ReceivePacket(packetData []byte) {
 	if len(packetData) > e.config.MaxPacketSize {
 		log.Errorf("[%s] packet too large to receive. packet is %d bytes, maximum is %d", e.config.Name, len(packetData), e.config.MaxPacketSize)
@@ -223,15 +228,18 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 	}
 }
 
+// GetAcks returns the number of acks and the acks themselves
 func (e *Endpoint) GetAcks() (int, []uint16) {
 	return e.numAcks, e.acks
 }
 
+// ClearAcks clears the endpoints ack array
 func (e *Endpoint) ClearAcks() {
 	e.numAcks = 0
 	e.acks = e.acks[:]
 }
 
+// Reset starts the endpoint fresh
 func (e *Endpoint) Reset() {
 	e.ClearAcks()
 	e.sequence = 0
@@ -249,6 +257,7 @@ func (e *Endpoint) Reset() {
 	e.fragmentReassembly.Reset()
 }
 
+// Update recalculates statistics (like packet loss)
 func (e *Endpoint) Update(time float64) {
 	e.time = time
 
@@ -366,26 +375,32 @@ func (e *Endpoint) Update(time float64) {
 	}
 }
 
+// PacketsSent returns the number of packets sent
 func (e *Endpoint) PacketsSent() uint64 {
 	return e.counters[counterNumPacketsSent]
 }
 
+// PacketsReceived returns the number of packets received
 func (e *Endpoint) PacketsReceived() uint64 {
 	return e.counters[counterNumPacketsReceived]
 }
 
+// PacketsAcked returns the number of packets acked
 func (e *Endpoint) PacketsAcked() uint64 {
 	return e.counters[counterNumPacketsAcked]
 }
 
+// Rtt returns the round-trip time
 func (e *Endpoint) Rtt() float64 {
 	return e.rtt
 }
 
+// PacketLoss returns the percent of packets lost this endpoint is experiencing
 func (e *Endpoint) PacketLoss() float64 {
 	return e.packetLoss
 }
 
+// Bandwith returns the sent, received, and acked bandwidth in Kbps
 func (e *Endpoint) Bandwidth() (float64, float64, float64) {
 	return e.sentBandwidthKbps, e.receivedBandwidthKbps, e.ackedBandwidthKbps
 }
