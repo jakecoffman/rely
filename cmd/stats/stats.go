@@ -11,16 +11,18 @@ import (
 	"github.com/op/go-logging"
 	"os/signal"
 	"fmt"
+	"math"
 )
 
-var globalTime float64 = 100
+const testMaxPacketBytes = 290
+var globalTime = 100.
 
 type testContext struct {
 	client *rely.Endpoint
 	server *rely.Endpoint
 }
 
-var globalContext = testContext{}
+var globalContext = &testContext{}
 
 func main() {
 	logging.SetLevel(logging.ERROR, "rely")
@@ -48,7 +50,7 @@ func main() {
 		close(signals)
 	}()
 
-	deltaTime := .1
+	deltaTime := .01
 
 	if numIterations > 0 {
 		for i := 0; i < numIterations; i++ {
@@ -71,16 +73,16 @@ func initialize() {
 	clientConfig := rely.NewDefaultConfig()
 	serverConfig := rely.NewDefaultConfig()
 
-	clientConfig.FragmentAbove = 500
-	serverConfig.FragmentAbove = 500
+	clientConfig.FragmentAbove = testMaxPacketBytes
+	serverConfig.FragmentAbove = testMaxPacketBytes
 
-	clientConfig.Context = &globalContext
+	clientConfig.Context = globalContext
 	clientConfig.Name = "client"
 	clientConfig.Index = 0
 	clientConfig.TransmitPacketFunction = testTransmitPacketFunction
 	clientConfig.ProcessPacketFunction = testProcessPacketFunction
 
-	serverConfig.Context = &globalContext
+	serverConfig.Context = globalContext
 	serverConfig.Name = "server"
 	serverConfig.Index = 1
 	serverConfig.TransmitPacketFunction = testTransmitPacketFunction
@@ -91,27 +93,28 @@ func initialize() {
 }
 
 func generatePacketData(sequence uint16) []byte {
-	packetBytes := ((int(sequence) * 1023) % (testMaxPacketBytes - 2)) + 2
-	if packetBytes < 2 || packetBytes > testMaxPacketBytes {
-		log.Fatal("failed to gen packetBytes", packetBytes)
-	}
+	packetBytes := testMaxPacketBytes
 	packetData := make([]byte, packetBytes)
 	packetData[0] = byte(sequence & 0xFF)
 	packetData[1] = byte((sequence >> 8) & 0xFF)
 	for i := 2; i < packetBytes; i++ {
 		packetData[i] = byte((i + int(sequence)) % 256)
 	}
-	return packetData[:packetBytes]
+	return packetData
 }
 
 func iteration(time float64) {
-	sequence := globalContext.client.NextPacketSequence()
-	packetData := generatePacketData(sequence)
-	globalContext.client.SendPacket(packetData)
+	{
+		sequence := globalContext.client.NextPacketSequence()
+		packetData := generatePacketData(sequence)
+		globalContext.client.SendPacket(packetData)
+	}
 
-	sequence = globalContext.server.NextPacketSequence()
-	packetData = generatePacketData(sequence)
-	globalContext.server.SendPacket(packetData)
+	{
+		sequence := globalContext.server.NextPacketSequence()
+		packetData := generatePacketData(sequence)
+		globalContext.server.SendPacket(packetData)
+	}
 
 	globalContext.client.Update(time)
 	globalContext.server.Update(time)
@@ -125,8 +128,8 @@ func iteration(time float64) {
 		globalContext.client.PacketsSent(),
 		globalContext.client.PacketsReceived(),
 		globalContext.client.PacketsAcked(),
-		int(globalContext.client.Rtt()),
-		int(globalContext.client.PacketLoss()+.5),
+		globalContext.client.Rtt(),
+		int(math.Floor(globalContext.client.PacketLoss()+.5)),
 		int(sent), int(recved), int(acked),
 	)
 }
@@ -145,10 +148,8 @@ func testTransmitPacketFunction(context interface{}, index int, sequence uint16,
 	}
 }
 
-const testMaxPacketBytes = 16 * 1024
-
 func testProcessPacketFunction(_ interface{}, _ int, _ uint16, packetData []byte) bool {
-	if packetData == nil || len(packetData) <= 0 || len(packetData) >= testMaxPacketBytes {
+	if packetData == nil || len(packetData) <= 0 || len(packetData) > testMaxPacketBytes {
 		log.Fatal("invalid packet data")
 	}
 
@@ -159,8 +160,8 @@ func testProcessPacketFunction(_ interface{}, _ int, _ uint16, packetData []byte
 	var seq uint16
 	seq |= uint16(packetData[0])
 	seq |= uint16(packetData[1]) << 8
-	if len(packetData) < ((int(seq)*1023)%(testMaxPacketBytes-2))+2 {
-		log.Fatal("Size not right, expected ", ((int(seq)*1023)%(testMaxPacketBytes-2))+2, " got ", len(packetData))
+	if len(packetData) != testMaxPacketBytes {
+		log.Fatal("Size not right, expected ", testMaxPacketBytes, " got ", len(packetData))
 	}
 	for i := 2; i < len(packetData); i++ {
 		if packetData[i] != byte((i+int(seq))%256) {
