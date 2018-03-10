@@ -2,13 +2,14 @@ package main
 
 import (
 	"os"
-	"strconv"
 	"syscall"
 	"os/signal"
 	"github.com/jakecoffman/rely"
 	"math/rand"
 	"log"
 	"github.com/op/go-logging"
+	"runtime/pprof"
+	"flag"
 )
 
 var globalTime float64 = 100
@@ -20,17 +21,21 @@ type testContext struct {
 
 var globalContext = testContext{}
 
+// to profile, run `./soak -cpuprofile=prof -iterations=8000`, then run `go tool pprof soak profile`
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var iterations = flag.Int("iterations", -1, "number of iterations to run")
+
 func main() {
 	logging.SetLevel(logging.ERROR, "rely")
 
-	numIterations := -1
-
-	if len(os.Args) > 1 {
-		var err error
-		numIterations, err = strconv.Atoi(os.Args[1])
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
 		if err != nil {
-			panic("argument 2 must be an integer")
+			log.Fatal(err)
 		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
 
 	initialize()
@@ -48,8 +53,8 @@ func main() {
 
 	deltaTime := .1
 
-	if numIterations > 0 {
-		for i := 0; i < numIterations; i++ {
+	if *iterations > 0 {
+		for i := 0; i < *iterations; i++ {
 			if quit {
 				break
 			}

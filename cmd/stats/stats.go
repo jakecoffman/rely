@@ -124,9 +124,9 @@ func iteration(time float64) {
 		counters[rely.CounterNumPacketsSent],
 		counters[rely.CounterNumPacketsReceived],
 		counters[rely.CounterNumPacketsAcked],
-		globalContext.client.Rtt(),
-		globalContext.client.PacketLoss()+.5,
-		sent, recved, acked,
+		int(globalContext.client.Rtt()),
+		int(globalContext.client.PacketLoss()+.5),
+		int(sent), int(recved), int(acked),
 	)
 }
 
