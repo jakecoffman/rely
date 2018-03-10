@@ -37,7 +37,7 @@ func (sb *sequenceBuffer) Reset() {
 // RemoveEntries removes old entries from start sequence to finish sequence (inclusive)
 func (sb *sequenceBuffer) RemoveEntries(start, finish int) {
 	if finish < start {
-		finish += 65535
+		finish += 65536
 	}
 	if finish - start < sb.NumEntries {
 		for sequence := start; sequence <= finish; sequence++ {
