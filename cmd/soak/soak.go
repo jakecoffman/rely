@@ -95,7 +95,7 @@ func initialize() {
 	globalContext.server = rely.NewEndpoint(serverConfig, globalTime)
 }
 
-func testTransmitPacketFunction(context interface{}, index int, sequence uint16, packetData []byte) {
+func testTransmitPacketFunction(context interface{}, index int, _ uint16, packetData []byte) {
 	ctx := context.(*testContext)
 
 	if rand.Intn(100) < 5 {
@@ -111,7 +111,7 @@ func testTransmitPacketFunction(context interface{}, index int, sequence uint16,
 
 const testMaxPacketBytes = 16*1024
 
-func testProcessPacketFunction(context interface{}, index int, sequence uint16, packetData []byte) bool{
+func testProcessPacketFunction(_ interface{}, _ int, _ uint16, packetData []byte) bool{
 	if packetData == nil || len(packetData) <= 0 || len(packetData) >= testMaxPacketBytes {
 		log.Fatal("invalid packet data")
 	}

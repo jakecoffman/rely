@@ -117,13 +117,12 @@ func iteration(time float64) {
 	globalContext.client.ClearAcks()
 	globalContext.server.ClearAcks()
 
-	counters := globalContext.client.Counters
 	sent, recved, acked := globalContext.client.Bandwidth()
 
 	fmt.Printf("%v sent | %v received | %v acked | rtt = %vms | packet loss = %v%% | sent = %vkbps | recv = %vkbps | acked = %vkbps\n",
-		counters[rely.CounterNumPacketsSent],
-		counters[rely.CounterNumPacketsReceived],
-		counters[rely.CounterNumPacketsAcked],
+		globalContext.client.PacketsSent(),
+		globalContext.client.PacketsReceived(),
+		globalContext.client.PacketsAcked(),
 		int(globalContext.client.Rtt()),
 		int(globalContext.client.PacketLoss()+.5),
 		int(sent), int(recved), int(acked),
@@ -146,7 +145,7 @@ func testTransmitPacketFunction(context interface{}, index int, sequence uint16,
 
 const testMaxPacketBytes = 16 * 1024
 
-func testProcessPacketFunction(context interface{}, index int, sequence uint16, packetData []byte) bool {
+func testProcessPacketFunction(_ interface{}, _ int, _ uint16, packetData []byte) bool {
 	if packetData == nil || len(packetData) <= 0 || len(packetData) >= testMaxPacketBytes {
 		log.Fatal("invalid packet data")
 	}

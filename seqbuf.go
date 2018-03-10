@@ -53,7 +53,7 @@ func (sb *sequenceBuffer) RemoveEntries(start, finish int) {
 
 // TestInsert checks to see if the sequence can be inserted
 func (sb *sequenceBuffer) TestInsert(sequence uint16) bool {
-	if LessThan(sequence, sb.Sequence - uint16(sb.NumEntries)) {
+	if lessThan(sequence, sb.Sequence - uint16(sb.NumEntries)) {
 		return false
 	}
 	return true
@@ -108,11 +108,11 @@ func newSentPacketSequenceBuffer(numEntries int) *sentPacketSequenceBuffer {
 
 // Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
 func (sb *sentPacketSequenceBuffer) Insert(sequence uint16) *SentPacketData {
-	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
+	if lessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
 		// sequence is too low
 		return nil
 	}
-	if GreaterThan(sequence + 1, sb.Sequence) {
+	if greaterThan(sequence + 1, sb.Sequence) {
 		// move the sequence forward, drop old entries
 		sb.RemoveEntries(int(sb.Sequence), int(sequence))
 		sb.Sequence = sequence + 1
@@ -154,11 +154,11 @@ func newReceivedPacketSequenceBuffer(numEntries int) *receivedPacketSequenceBuff
 
 // Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
 func (sb *receivedPacketSequenceBuffer) Insert(sequence uint16) *ReceivedPacketData {
-	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
+	if lessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
 		// sequence is too low
 		return nil
 	}
-	if GreaterThan(sequence + 1, sb.Sequence) {
+	if greaterThan(sequence + 1, sb.Sequence) {
 		// move the sequence forward, drop old entries
 		sb.RemoveEntries(int(sb.Sequence), int(sequence))
 		sb.Sequence = sequence + 1
@@ -200,11 +200,11 @@ func newFragmentSequenceBuffer(numEntries int) *fragmentSequenceBuffer {
 
 // Insert marks the sequence as used and returns an address to the buffer, or nil if insertion is invalid
 func (sb *fragmentSequenceBuffer) Insert(sequence uint16) *FragmentReassemblyData {
-	if LessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
+	if lessThan(sequence, sb.Sequence-uint16(sb.NumEntries)) {
 		// sequence is too low
 		return nil
 	}
-	if GreaterThan(sequence + 1, sb.Sequence) {
+	if greaterThan(sequence + 1, sb.Sequence) {
 		// move the sequence forward, drop old entries
 		sb.RemoveEntries(int(sb.Sequence), int(sequence))
 		sb.Sequence = sequence + 1
