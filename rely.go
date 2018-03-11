@@ -222,7 +222,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 		if reassemblyData.NumFragmentsReceived == reassemblyData.NumFragmentsTotal {
 			log.Debugf("[%s] completed reassembly of packet %d", e.config.Name, sequence)
 			e.ReceivePacket(reassemblyData.PacketData[MaxPacketHeaderBytes-reassemblyData.PacketHeaderBytes:MaxPacketHeaderBytes+reassemblyData.PacketBytes])
-			e.fragmentReassembly.Remove(sequence) // TODO withcleanup?
+			e.fragmentReassembly.Remove(sequence)
 		}
 
 		e.counters[counterNumFragmentsReceived]++

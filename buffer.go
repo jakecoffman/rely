@@ -66,15 +66,8 @@ func (b *buffer) getUint16() (uint16, error) {
 	return n, nil
 }
 
-func (b *buffer) writeByte(n byte) {
-	b.buf[b.pos] = n
-	b.pos++
-}
-
 func (b *buffer) writeBytes(src []byte) {
-	for i := 0; i < len(src); i += 1 {
-		b.writeByte(src[i])
-	}
+	b.pos += copy(b.buf[b.pos:], src)
 }
 
 func (b *buffer) writeUint8(n uint8) {

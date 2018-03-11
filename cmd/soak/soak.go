@@ -137,12 +137,11 @@ func testProcessPacketFunction(_ interface{}, _ int, _ uint16, packetData []byte
 	return true
 }
 
-func generatePacketData(sequence uint16) []byte {
+func generatePacketData(sequence uint16, packetData []byte) []byte {
 	packetBytes := ((int(sequence)*1023) % (testMaxPacketBytes - 2)) + 2
 	if packetBytes < 2 || packetBytes > testMaxPacketBytes {
 		log.Fatal("failed to gen packetBytes", packetBytes)
 	}
-	packetData := make([]byte, packetBytes)
 	packetData[0] = byte(sequence & 0xFF)
 	packetData[1] = byte((sequence >> 8) & 0xFF)
 	for i := 2; i < packetBytes; i++ {
@@ -151,14 +150,16 @@ func generatePacketData(sequence uint16) []byte {
 	return packetData[:packetBytes]
 }
 
+var packetData = make([]byte, testMaxPacketBytes)
+
 func iteration(time float64) {
 	sequence := globalContext.client.NextPacketSequence()
-	packetData := generatePacketData(sequence)
-	globalContext.client.SendPacket(packetData)
+	data := generatePacketData(sequence, packetData)
+	globalContext.client.SendPacket(data)
 
 	sequence = globalContext.server.NextPacketSequence()
-	packetData = generatePacketData(sequence)
-	globalContext.server.SendPacket(packetData)
+	data = generatePacketData(sequence, packetData)
+	globalContext.server.SendPacket(data)
 
 	globalContext.client.Update(time)
 	globalContext.server.Update(time)

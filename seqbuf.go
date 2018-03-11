@@ -4,8 +4,6 @@ import (
 	"math"
 )
 
-// TODO add option for custom allocator, especially to avoid GC
-
 // sequenceBuffer is a generic store for sent and received packets, as well as fragments of packets.
 // The entry data is the actual custom packet data that the user is trying to send
 type sequenceBuffer struct {
@@ -59,18 +57,9 @@ func (sb *sequenceBuffer) TestInsert(sequence uint16) bool {
 	return true
 }
 
-// TODO
-func (sb *sequenceBuffer) InsertWithCleanup() interface{} {
-	panic("TODO")
-	return nil
-}
-
 func (sb *sequenceBuffer) Remove(sequence uint16) {
 	sb.EntrySequence[int(sequence)%sb.NumEntries] = available
 }
-
-// TODO
-func (sb *sequenceBuffer) RemoveWithCleanup() {}
 
 func (sb *sequenceBuffer) Available(sequence uint16) bool {
 	return sb.EntrySequence[int(sequence)] == available
@@ -92,7 +81,6 @@ func (sb *sequenceBuffer) GenerateAckBits(ack *uint16, ackBits *uint32) {
 		mask <<= 1
 	}
 }
-
 
 type sentPacketSequenceBuffer struct {
 	*sequenceBuffer
