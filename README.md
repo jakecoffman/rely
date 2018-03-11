@@ -66,7 +66,7 @@ go build -tags=test && /usr/bin/time -v ./soak -iterations=8100 -pool=true
 
 C version
 ```
-$ premake5 soak && /usr/bin/time -v ./soak 8100
+$ premake5 soak && /usr/bin/time -v ./bin/soak 8100
 	Command being timed: "./bin/soak 8100"
 	User time (seconds): 1.48
 	System time (seconds): 0.00
