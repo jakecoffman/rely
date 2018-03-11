@@ -26,6 +26,7 @@ var globalContext = testContext{}
 // to profile, run `./soak -cpuprofile=prof -iterations=8000`, then run `go tool pprof soak profile`
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var iterations = flag.Int("iterations", -1, "number of iterations to run")
+var pool = flag.Bool("pool", false, "use memory pool")
 var loglevel = flag.Int("loglevel", int(logging.ERROR), "log level (5 for debug)")
 
 func main() {
@@ -74,9 +75,40 @@ func main() {
 	}
 }
 
+// custom allocate/free to avoid gc
+var cache = map[int][][]byte{}
+
+func poolAllocate(size int) []byte {
+	entry := cache[size]
+
+	if entry == nil {
+		cache[size] = [][]byte{}
+		return make([]byte, size)
+	}
+
+	if len(entry) == 0 {
+		return make([]byte, size)
+	}
+
+	data := entry[len(entry) - 1]
+	cache[size] = entry[:len(entry) - 1]
+	return data
+}
+
+func poolFree(data []byte) {
+	cache[len(data)] = append(cache[len(data)], data)
+}
+
 func initialize() {
 	clientConfig := rely.NewDefaultConfig()
 	serverConfig := rely.NewDefaultConfig()
+
+	if *pool {
+		clientConfig.Allocate = poolAllocate
+		clientConfig.Free = poolFree
+		serverConfig.Allocate = poolAllocate
+		serverConfig.Free = poolFree
+	}
 
 	clientConfig.FragmentAbove = 500
 	serverConfig.FragmentAbove = 500

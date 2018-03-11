@@ -24,19 +24,37 @@ type Endpoint struct {
 	receivedPackets       *receivedPacketSequenceBuffer
 	fragmentReassembly    *fragmentSequenceBuffer
 	counters              [counterMax]uint64
+
+	allocate func(int) []byte
+	free     func([]byte)
 }
 
 // NewEndpoint creates an endpoint
 func NewEndpoint(config *Config, time float64) *Endpoint {
-	return &Endpoint{
+	endpoint := &Endpoint{
 		config:             config,
 		time:               time,
 		sentPackets:        newSentPacketSequenceBuffer(config.SentPacketsBufferSize),
 		receivedPackets:    newReceivedPacketSequenceBuffer(config.ReceivedPacketsBufferSize),
 		fragmentReassembly: newFragmentSequenceBuffer(config.FragmentReassemblyBufferSize),
 		acks:               make([]uint16, config.AckBufferSize),
+		allocate:           config.Allocate,
+		free:               config.Free,
 	}
+	if endpoint.allocate == nil {
+		endpoint.allocate = defaultAllocate
+	}
+	if endpoint.free == nil {
+		endpoint.free = defaultFree
+	}
+
+	return endpoint
 }
+
+func defaultAllocate(size int) []byte {
+	return make([]byte, size)
+}
+func defaultFree(_ []byte) {}
 
 // NextPacketSequence returns the next packet sequence that will be used
 func (e *Endpoint) NextPacketSequence() uint16 {
@@ -65,14 +83,14 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 	if packetBytes <= e.config.FragmentAbove {
 		// regular packet
 		log.Debugf("[%s] sending packet %d without fragmentation", e.config.Name, sequence)
-		transmitPacketData := newBuffer(packetBytes + MaxPacketHeaderBytes)
+		transmitPacketData := newBufferFromRef(e.allocate(packetBytes + MaxPacketHeaderBytes))
 		_ = writePacketHeader(transmitPacketData, sequence, ack, ackBits)
 		transmitPacketData.writeBytes(packetData)
 		e.config.TransmitPacketFunction(e.config.Context, e.config.Index, sequence, transmitPacketData.bytes())
-		// TODO free(transmitPacketData)
+		e.free(transmitPacketData.buf)
 	} else {
 		// fragment packet
-		packetHeader := newBuffer(MaxPacketHeaderBytes)
+		packetHeader := newBufferFromRef(e.allocate(MaxPacketHeaderBytes))
 		_ = writePacketHeader(packetHeader, sequence, ack, ackBits)
 		var extra int
 		if packetBytes%e.config.FragmentSize != 0 {
@@ -83,7 +101,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 		fragmentBufferSize := FragmentHeaderBytes + MaxPacketHeaderBytes + e.config.FragmentSize
 
 		q := newBufferFromRef(packetData)
-		p := newBuffer(fragmentBufferSize)
+		p := newBufferFromRef(e.allocate(fragmentBufferSize))
 
 		// write each fragment with header and data
 		for fragmentId := 0; fragmentId < numFragments; fragmentId++ {
@@ -107,7 +125,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 			e.config.TransmitPacketFunction(e.config.Context, e.config.Index, sequence, p.bytes())
 			e.counters[counterNumFragmentsSent]++
 		}
-		// TODO free(fragmentPacketData)
+		e.free(p.buf)
 	}
 	e.counters[counterNumPacketsSent]++
 }
@@ -185,7 +203,6 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 
 		reassemblyData := e.fragmentReassembly.Find(sequence)
 		if reassemblyData == nil {
-			// TODO withCleanup
 			reassemblyData = e.fragmentReassembly.Insert(sequence)
 			if reassemblyData == nil {
 				log.Errorf("[%s] ignoring invalid fragment. could not insert in reassembly buffer (stale)", e.config.Name)
@@ -199,7 +216,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 			reassemblyData.AckBits = 0
 			reassemblyData.NumFragmentsReceived = 0
 			reassemblyData.NumFragmentsTotal = numFragments
-			reassemblyData.PacketData = make([]byte, packetBufferSize)
+			reassemblyData.PacketData = e.allocate(packetBufferSize)
 			reassemblyData.FragmentReceived = [256]uint8{}
 		}
 
@@ -222,6 +239,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 		if reassemblyData.NumFragmentsReceived == reassemblyData.NumFragmentsTotal {
 			log.Debugf("[%s] completed reassembly of packet %d", e.config.Name, sequence)
 			e.ReceivePacket(reassemblyData.PacketData[MaxPacketHeaderBytes-reassemblyData.PacketHeaderBytes:MaxPacketHeaderBytes+reassemblyData.PacketBytes])
+			e.free(reassemblyData.PacketData)
 			e.fragmentReassembly.Remove(sequence)
 		}
 

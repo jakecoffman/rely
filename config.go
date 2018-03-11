@@ -17,10 +17,15 @@ type Config struct {
 	PacketLossSmoothingFactor    float64
 	BandwidthSmoothingFactor     float64
 	PacketHeaderSize             int
+
 	// TransmitPacketFunction is called by SendPacket to do the actual transmitting of packets
-	TransmitPacketFunction       func(interface{}, int, uint16, []byte)
+	TransmitPacketFunction func(interface{}, int, uint16, []byte)
 	// ProcessPacketFunction is called by ReceivePacket once a fully assembled packet is received
-	ProcessPacketFunction        func(interface{}, int, uint16, []byte) bool
+	ProcessPacketFunction func(interface{}, int, uint16, []byte) bool
+	// Allocate can be used to implement custom memory allocation
+	Allocate func(int) []byte
+	// Free can be used to implement custom memory allocation
+	Free func([]byte)
 }
 
 // NewDefaultConfig creates a typical endpoint configuration
