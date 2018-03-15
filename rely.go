@@ -82,7 +82,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 
 	if packetBytes <= e.config.FragmentAbove {
 		// regular packet
-		log.Debugf("[%s] sending packet %d without fragmentation", e.config.Name, sequence)
+		debugf("[%s] sending packet %d without fragmentation", e.config.Name, sequence)
 		transmitPacketData := newBufferFromRef(e.allocate(packetBytes + MaxPacketHeaderBytes))
 		_ = writePacketHeader(transmitPacketData, sequence, ack, ackBits)
 		transmitPacketData.writeBytes(packetData)
@@ -97,7 +97,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 			extra = 1
 		}
 		numFragments := (packetBytes / e.config.FragmentSize) + extra
-		log.Debugf("[%s] sending packet %d as %d fragments", e.config.Name, sequence, numFragments)
+		debugf("[%s] sending packet %d as %d fragments", e.config.Name, sequence, numFragments)
 		fragmentBufferSize := FragmentHeaderBytes + MaxPacketHeaderBytes + e.config.FragmentSize
 
 		q := newBufferFromRef(packetData)
@@ -160,9 +160,9 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 			return
 		}
 
-		log.Debugf("[%s] processing packet %d", e.config.Name, sequence)
+		debugf("[%s] processing packet %d", e.config.Name, sequence)
 		if e.config.ProcessPacketFunction(e.config.Context, e.config.Index, sequence, packetData[packetHeaderBytes:]) {
-			log.Debugf("[%s] process packet %d successful", e.config.Name, sequence)
+			debugf("[%s] process packet %d successful", e.config.Name, sequence)
 			receivedPacketData := e.receivedPackets.Insert(sequence)
 			receivedPacketData.Time = e.time
 			receivedPacketData.PacketBytes = uint32(e.config.PacketHeaderSize + len(packetData))
@@ -172,7 +172,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 					ackSequence := ack - uint16(i)
 					sentPacketData := e.sentPackets.Find(ackSequence)
 					if sentPacketData != nil && sentPacketData.Acked == 0 && e.numAcks < e.config.AckBufferSize {
-						log.Debugf("[%s] acked packet %d", e.config.Name, sequence)
+						debugf("[%s] acked packet %d", e.config.Name, sequence)
 						e.acks[e.numAcks] = ackSequence
 						e.numAcks++
 						e.counters[counterNumPacketsAcked]++
@@ -232,13 +232,13 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 			return
 		}
 
-		log.Debugf("[%s] received fragment %d of packet %d (%d/%d)", e.config.Name, fragmentId, sequence, reassemblyData.NumFragmentsReceived+1, numFragments)
+		debugf("[%s] received fragment %d of packet %d (%d/%d)", e.config.Name, fragmentId, sequence, reassemblyData.NumFragmentsReceived+1, numFragments)
 		reassemblyData.NumFragmentsReceived++
 		reassemblyData.FragmentReceived[fragmentId] = 1
 		reassemblyData.StoreFragmentData(sequence, ack, ackBits, fragmentId, e.config.FragmentSize, packetData[fragHeaderBytes:])
 
 		if reassemblyData.NumFragmentsReceived == reassemblyData.NumFragmentsTotal {
-			log.Debugf("[%s] completed reassembly of packet %d", e.config.Name, sequence)
+			debugf("[%s] completed reassembly of packet %d", e.config.Name, sequence)
 			e.ReceivePacket(reassemblyData.PacketData[MaxPacketHeaderBytes-reassemblyData.PacketHeaderBytes:MaxPacketHeaderBytes+reassemblyData.PacketBytes])
 			e.free(reassemblyData.PacketData)
 			e.fragmentReassembly.Remove(sequence)
