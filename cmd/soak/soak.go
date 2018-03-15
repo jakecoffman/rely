@@ -12,6 +12,7 @@ import (
 	"github.com/op/go-logging"
 	"runtime/pprof"
 	"flag"
+	"bytes"
 )
 
 var globalTime float64 = 100
@@ -155,13 +156,12 @@ func testProcessPacketFunction(_ interface{}, _ int, _ uint16, packetData []byte
 	var seq uint16
 	seq |= uint16(packetData[0])
 	seq |= uint16(packetData[1]) << 8
-	if len(packetData) < ((int(seq)*1023)%(testMaxPacketBytes-2))+2 {
-		log.Fatal("Size not right, expected ", ((int(seq)*1023)%(testMaxPacketBytes-2))+2, " got ", len(packetData))
+	expectedBytes := ((int(seq)*1023)%(testMaxPacketBytes-2))+2
+	if len(packetData) != expectedBytes {
+		log.Fatal("Size not right, expected ", expectedBytes, " got ", len(packetData))
 	}
-	for i := 2; i < len(packetData); i++ {
-		if packetData[i] != byte((i+int(seq))%256) {
-			log.Fatal("Wrong packet data at index ", i, " got ", packetData[i], " expected ", (i+int(seq))%256)
-		}
+	if bytes.Compare(packetData[2:], globalPacketData[2:expectedBytes]) != 0 {
+		log.Fatal("Wrong packet data")
 	}
 
 	return true
@@ -180,15 +180,15 @@ func generatePacketData(sequence uint16, packetData []byte) []byte {
 	return packetData[:packetBytes]
 }
 
-var packetData = make([]byte, testMaxPacketBytes)
+var globalPacketData = make([]byte, testMaxPacketBytes)
 
 func iteration(time float64) {
 	sequence := globalContext.client.NextPacketSequence()
-	data := generatePacketData(sequence, packetData)
+	data := generatePacketData(sequence, globalPacketData)
 	globalContext.client.SendPacket(data)
 
 	sequence = globalContext.server.NextPacketSequence()
-	data = generatePacketData(sequence, packetData)
+	data = generatePacketData(sequence, globalPacketData)
 	globalContext.server.SendPacket(data)
 
 	globalContext.client.Update(time)
