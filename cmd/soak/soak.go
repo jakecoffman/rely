@@ -129,17 +129,15 @@ func initialize() {
 	globalContext.server = rely.NewEndpoint(serverConfig, globalTime)
 }
 
-func testTransmitPacketFunction(context interface{}, index int, _ uint16, packetData []byte) {
-	ctx := context.(*testContext)
-
+func testTransmitPacketFunction(_ interface{}, index int, _ uint16, packetData []byte) {
 	if rand.Intn(100) < 5 {
 		return
 	}
 
 	if index == 0 {
-		ctx.server.ReceivePacket(packetData)
+		globalContext.server.ReceivePacket(packetData)
 	} else if index == 1 {
-		ctx.client.ReceivePacket(packetData)
+		globalContext.client.ReceivePacket(packetData)
 	}
 }
 

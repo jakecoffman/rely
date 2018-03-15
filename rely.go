@@ -126,6 +126,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 			e.counters[counterNumFragmentsSent]++
 		}
 		e.free(p.buf)
+		e.free(packetHeader.buf)
 	}
 	e.counters[counterNumPacketsSent]++
 }
