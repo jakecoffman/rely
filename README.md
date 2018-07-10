@@ -12,20 +12,20 @@ rely without pooling
 ```
 $ go build -tags=test && /usr/bin/time -v ./soak -iterations=8100
 	Command being timed: "./soak -iterations=8100"
-	User time (seconds): 0.78
-	System time (seconds): 0.01
-	Percent of CPU this job got: 105%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.75
+	User time (seconds): 0.71
+	System time (seconds): 0.00
+	Percent of CPU this job got: 108%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.66
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 8360
+	Maximum resident set size (kbytes): 8364
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 1488
-	Voluntary context switches: 848
-	Involuntary context switches: 111
+	Minor (reclaiming a frame) page faults: 1462
+	Voluntary context switches: 880
+	Involuntary context switches: 93
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 0
@@ -40,20 +40,20 @@ rely with pooling
 ```
 $ go build -tags=test && /usr/bin/time -v ./soak -iterations=8100 -pool=true
 	Command being timed: "./soak -iterations=8100 -pool=true"
-	User time (seconds): 0.66
-	System time (seconds): 0.00
-	Percent of CPU this job got: 103%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.64
+	User time (seconds): 0.54
+	System time (seconds): 0.01
+	Percent of CPU this job got: 102%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.54
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 8204
+	Maximum resident set size (kbytes): 8492
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 1472
-	Voluntary context switches: 373
-	Involuntary context switches: 72
+	Minor (reclaiming a frame) page faults: 1487
+	Voluntary context switches: 408
+	Involuntary context switches: 63
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 0
