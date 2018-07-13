@@ -36,7 +36,7 @@ func NewEndpoint(config *Config, time float64) *Endpoint {
 		SentPackets:        newSentPacketSequenceBuffer(config.SentPacketsBufferSize),
 		receivedPackets:    newReceivedPacketSequenceBuffer(config.ReceivedPacketsBufferSize),
 		fragmentReassembly: newFragmentSequenceBuffer(config.FragmentReassemblyBufferSize),
-		acks:               make([]uint16, config.AckBufferSize),
+		acks:               make([]uint16, 0, config.AckBufferSize),
 		allocate:           config.Allocate,
 		free:               config.Free,
 	}

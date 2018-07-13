@@ -142,8 +142,8 @@ func TestAcks(t *testing.T) {
 	}
 
 	senderAckedPacket := make([]uint8, testAcksNumIterations)
-	numSenderAcks, senderAcks := context.sender.GetAcks()
-	for i := 0; i < numSenderAcks; i++ {
+	senderAcks := context.sender.GetAcks()
+	for i := 0; i < len(senderAcks); i++ {
 		if senderAcks[i] < testAcksNumIterations {
 			senderAckedPacket[senderAcks[i]] = 1
 		}
@@ -155,8 +155,8 @@ func TestAcks(t *testing.T) {
 	}
 
 	receiverAckedPacket := make([]uint8, testAcksNumIterations)
-	numReceiverAcks, receiverAcks := context.receiver.GetAcks()
-	for i := 0; i < numReceiverAcks; i++ {
+	receiverAcks := context.receiver.GetAcks()
+	for i := 0; i < len(receiverAcks); i++ {
 		if receiverAcks[i] < testAcksNumIterations {
 			receiverAckedPacket[receiverAcks[i]] = 1
 		}
@@ -208,8 +208,8 @@ func TestAcksPacketLoss(t *testing.T) {
 	}
 
 	senderAckedPacket := make([]uint8, testAcksNumIterations)
-	numSenderAcks, senderAcks := context.sender.GetAcks()
-	for i := 0; i < numSenderAcks; i++ {
+	senderAcks := context.sender.GetAcks()
+	for i := 0; i < len(senderAcks); i++ {
 		if senderAcks[i] < testAcksNumIterations {
 			senderAckedPacket[senderAcks[i]] = 1
 		}
@@ -221,8 +221,8 @@ func TestAcksPacketLoss(t *testing.T) {
 	}
 
 	receiverAckedPacket := make([]uint8, testAcksNumIterations)
-	numReceiverAcks, receiverAcks := context.sender.GetAcks()
-	for i := 0; i < numReceiverAcks; i++ {
+	receiverAcks := context.sender.GetAcks()
+	for i := 0; i < len(receiverAcks); i++ {
 		if receiverAcks[i] < testAcksNumIterations {
 			receiverAckedPacket[senderAcks[i]] = 1
 		}
