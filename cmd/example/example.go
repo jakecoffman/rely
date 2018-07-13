@@ -28,7 +28,12 @@ const tickrate = 20
 const packetByteSize = 1024/tickrate
 
 var incoming = make(chan []byte, 1000)
-var packetData = map[uint16][]byte{}
+
+type entry struct {
+	data []byte
+	time float64
+}
+var packetData = map[uint16]entry{}
 
 func main() {
 	const bufferSize = packetByteSize + rely.MaxPacketHeaderBytes
@@ -119,25 +124,20 @@ func main() {
 		endpoint.ClearAcks()
 
 		// resend packets that haven't been acked in over 150ms
-		for sequence, data := range packetData {
-			packet := endpoint.SentPackets.Find(sequence)
-			if packet == nil {
-				// probably the packet was too old and was dropped?
-				delete(packetData, sequence)
-				continue
-			}
-
-			if t - packet.Time > .15 {
+		for sequence, entry := range packetData {
+			if t - entry.time > .15 {
 				fmt.Println("Resending packet", sequence)
-				endpoint.SendPacket(data)
+				endpoint.SendPacket(entry.data)
+				// since resent packets get new sequence, delete
+				delete(packetData, sequence)
 			}
 		}
 
-		// send new updates
+		// send new updates (uses sequence to generate data, normally don't do this)
 		sequence := endpoint.NextPacketSequence()
 		data := generatePacketData(sequence, make([]byte, packetByteSize))
 		endpoint.SendPacket(data)
-		packetData[sequence] = data
+		packetData[sequence] = entry{time: t, data: data}
 
 		sent, recved, acked := endpoint.Bandwidth()
 		fmt.Printf("%v sent | %v received | %v acked | rtt = %vms | packet loss = %v%% | sent = %vkbps | recv = %vkbps | acked = %vkbps\n",
