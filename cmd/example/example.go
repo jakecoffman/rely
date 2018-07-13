@@ -13,7 +13,6 @@ import (
 )
 
 var endpoint *rely.Endpoint
-var globalTime = float64(time.Now().UnixNano()) / (1000 * 1000 * 1000)
 
 var name = flag.String("name", "server", "name of connection")
 var addr = flag.String("addr", "0.0.0.0:8987", "host and port of connection")
@@ -25,11 +24,14 @@ var clients = map[string]net.Addr{}
 // used by clients
 var conn net.Conn
 
+const tickrate = 20
+const packetByteSize = 1024/tickrate
+
 var incoming = make(chan []byte, 1000)
+var packetData = map[uint16][]byte{}
 
 func main() {
-	// TODO: must be a bug somewhere... this should be 1024
-	const bufferSize = 1038
+	const bufferSize = packetByteSize + rely.MaxPacketHeaderBytes
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -64,6 +66,9 @@ func main() {
 		} ()
 
 		log.Println("Server ready")
+
+		// wait for first connection
+		incoming<- <-incoming
 	} else {
 		config.Index = 2
 		conn, err = net.Dial("udp", *addr)
@@ -86,28 +91,53 @@ func main() {
 		log.Println("Client ready")
 	}
 
-	endpoint = rely.NewEndpoint(config, globalTime)
+	endpoint = rely.NewEndpoint(config, now())
+
+	networkTick := time.NewTicker(time.Second/tickrate)
 
 	for {
-		globalTime = float64(time.Now().UnixNano()) / (1000 * 1000 * 1000)
-
+		// process all incoming packets
 		processIncoming:
 		for {
+			endpoint.Update(now())
+
 			select {
 			case d := <-incoming:
 				endpoint.ReceivePacket(d)
-			default:
+			case <-networkTick.C:
 				break processIncoming
 			}
 		}
+		t := now()
+		endpoint.Update(t)
 
-		sequence := endpoint.NextPacketSequence()
-		data := generatePacketData(sequence, make([]byte, testMaxPacketBytes))
-		endpoint.SendPacket(data)
-
-		endpoint.Update(globalTime)
-
+		// clear the stored packets that have been acked
+		acks := endpoint.GetAcks()
+		for _, sequence := range acks {
+			delete(packetData, sequence)
+		}
 		endpoint.ClearAcks()
+
+		// resend packets that haven't been acked in over 150ms
+		for sequence, data := range packetData {
+			packet := endpoint.SentPackets.Find(sequence)
+			if packet == nil {
+				// probably the packet was too old and was dropped?
+				delete(packetData, sequence)
+				continue
+			}
+
+			if t - packet.Time > .15 {
+				fmt.Println("Resending packet", sequence)
+				endpoint.SendPacket(data)
+			}
+		}
+
+		// send new updates
+		sequence := endpoint.NextPacketSequence()
+		data := generatePacketData(sequence, make([]byte, packetByteSize))
+		endpoint.SendPacket(data)
+		packetData[sequence] = data
 
 		sent, recved, acked := endpoint.Bandwidth()
 		fmt.Printf("%v sent | %v received | %v acked | rtt = %vms | packet loss = %v%% | sent = %vkbps | recv = %vkbps | acked = %vkbps\n",
@@ -118,17 +148,20 @@ func main() {
 			int(math.Floor(endpoint.PacketLoss()+.5)),
 			int(sent), int(recved), int(acked),
 		)
-		time.Sleep(16 * time.Millisecond)
+		if int(math.Floor(endpoint.PacketLoss()+.5)) > 10 {
+			return
+		}
 	}
 }
 
-func transmitPacket(_ interface{}, index int, sequence uint16, packetData []byte) {
-	if sequence%5 == 0 {
-		return
-	}
-
+func transmitPacket(_ interface{}, index int, _ uint16, packetData []byte) {
 	var n int
 	var err error
+
+	if rand.Intn(100) == 0 {
+		// 1% packet loss
+		return
+	}
 
 	if index == 1 {
 		for _, addr := range clients {
@@ -148,10 +181,8 @@ func transmitPacket(_ interface{}, index int, sequence uint16, packetData []byte
 	}
 }
 
-const testMaxPacketBytes = 16*1024
-
 func processPacket(_ interface{}, _ int, _ uint16, packetData []byte) bool {
-	if packetData == nil || len(packetData) <= 0 || len(packetData) >= testMaxPacketBytes {
+	if packetData == nil || len(packetData) != packetByteSize {
 		log.Fatal("invalid packet data")
 	}
 
@@ -162,7 +193,7 @@ func processPacket(_ interface{}, _ int, _ uint16, packetData []byte) bool {
 	var seq uint16
 	seq |= uint16(packetData[0])
 	seq |= uint16(packetData[1]) << 8
-	expectedBytes := ((int(seq)*1023)%(testMaxPacketBytes-2))+2
+	expectedBytes := packetByteSize
 	if len(packetData) != expectedBytes {
 		log.Fatal("Size not right, expected ", expectedBytes, " got ", len(packetData))
 	}
@@ -176,14 +207,15 @@ func processPacket(_ interface{}, _ int, _ uint16, packetData []byte) bool {
 }
 
 func generatePacketData(sequence uint16, packetData []byte) []byte {
-	packetBytes := ((int(sequence)*1023) % (testMaxPacketBytes - 2)) + 2
-	if packetBytes < 2 || packetBytes > testMaxPacketBytes {
-		log.Fatal("failed to gen packetBytes", packetBytes)
-	}
+	packetBytes := packetByteSize
 	packetData[0] = byte(sequence & 0xFF)
 	packetData[1] = byte((sequence >> 8) & 0xFF)
 	for i := 2; i < packetBytes; i++ {
 		packetData[i] = byte((i+int(sequence))%256)
 	}
 	return packetData[:packetBytes]
+}
+
+func now() float64 {
+	return float64(time.Now().UnixNano()) / (1000 * 1000 * 1000)
 }

@@ -17,10 +17,9 @@ type Endpoint struct {
 	sentBandwidthKbps     float64
 	receivedBandwidthKbps float64
 	ackedBandwidthKbps    float64
-	numAcks               int
 	acks                  []uint16
 	sequence              uint16
-	sentPackets           *sentPacketSequenceBuffer
+	SentPackets           *sentPacketSequenceBuffer
 	receivedPackets       *receivedPacketSequenceBuffer
 	fragmentReassembly    *fragmentSequenceBuffer
 	counters              [counterMax]uint64
@@ -34,7 +33,7 @@ func NewEndpoint(config *Config, time float64) *Endpoint {
 	endpoint := &Endpoint{
 		config:             config,
 		time:               time,
-		sentPackets:        newSentPacketSequenceBuffer(config.SentPacketsBufferSize),
+		SentPackets:        newSentPacketSequenceBuffer(config.SentPacketsBufferSize),
 		receivedPackets:    newReceivedPacketSequenceBuffer(config.ReceivedPacketsBufferSize),
 		fragmentReassembly: newFragmentSequenceBuffer(config.FragmentReassemblyBufferSize),
 		acks:               make([]uint16, config.AckBufferSize),
@@ -75,7 +74,7 @@ func (e *Endpoint) SendPacket(packetData []byte) {
 	var ackBits uint32
 
 	e.receivedPackets.GenerateAckBits(&ack, &ackBits)
-	sentPacketData := e.sentPackets.Insert(sequence)
+	sentPacketData := e.SentPackets.Insert(sequence)
 	sentPacketData.Time = e.time
 	sentPacketData.PacketBytes = uint32(e.config.PacketHeaderSize + packetBytes)
 	sentPacketData.Acked = 0
@@ -170,11 +169,10 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 			for i := 0; i < 32; i++ {
 				if ackBits&1 != 0 {
 					ackSequence := ack - uint16(i)
-					sentPacketData := e.sentPackets.Find(ackSequence)
-					if sentPacketData != nil && sentPacketData.Acked == 0 && e.numAcks < e.config.AckBufferSize {
+					sentPacketData := e.SentPackets.Find(ackSequence)
+					if sentPacketData != nil && sentPacketData.Acked == 0 && len(e.acks) + 1 < e.config.AckBufferSize {
 						debugf("[%s] acked packet %d", e.config.Name, sequence)
-						e.acks[e.numAcks] = ackSequence
-						e.numAcks++
+						e.acks = append(e.acks, ackSequence)
 						e.counters[counterNumPacketsAcked]++
 						sentPacketData.Acked = 1
 
@@ -248,15 +246,14 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 	}
 }
 
-// GetAcks returns the number of acks and the acks themselves
-func (e *Endpoint) GetAcks() (int, []uint16) {
-	return e.numAcks, e.acks
+// GetAcks returns the acks received so far, make sure to clear acks too
+func (e *Endpoint) GetAcks() []uint16 {
+	return e.acks
 }
 
 // ClearAcks clears the endpoints ack array
 func (e *Endpoint) ClearAcks() {
-	e.numAcks = 0
-	e.acks = e.acks[:]
+	e.acks = e.acks[:0]
 }
 
 // Reset starts the endpoint fresh
@@ -272,7 +269,7 @@ func (e *Endpoint) Reset() {
 		}
 	}
 
-	e.sentPackets.Reset()
+	e.SentPackets.Reset()
 	e.receivedPackets.Reset()
 	e.fragmentReassembly.Reset()
 }
@@ -283,12 +280,12 @@ func (e *Endpoint) Update(time float64) {
 
 	// calculate packet loss
 	{
-		baseSequence := (e.sentPackets.Sequence - uint16(e.config.SentPacketsBufferSize) + 1) + 0xFFFF
+		baseSequence := (e.SentPackets.Sequence - uint16(e.config.SentPacketsBufferSize) + 1) + 0xFFFF
 		var numDropped int
 		numSamples := e.config.SentPacketsBufferSize / 2
 		for i := 0; i < numSamples; i++ {
 			sequence := baseSequence + uint16(i)
-			sentPacketData := e.sentPackets.Find(sequence)
+			sentPacketData := e.SentPackets.Find(sequence)
 			if sentPacketData != nil && sentPacketData.Acked == 0 {
 				numDropped++
 			}
@@ -303,14 +300,14 @@ func (e *Endpoint) Update(time float64) {
 
 	// calculate sent bandwidth
 	{
-		baseSequence := (int(e.sentPackets.Sequence) - e.config.SentPacketsBufferSize + 1) + 0xFFFF
+		baseSequence := (int(e.SentPackets.Sequence) - e.config.SentPacketsBufferSize + 1) + 0xFFFF
 		var bytesSent int
 		startTime := math.MaxFloat64
 		var finishTime float64
 		numSamples := e.config.SentPacketsBufferSize / 2
 		for i := 0; i < numSamples; i++ {
 			sequence := uint16(baseSequence + i)
-			sentPacketData := e.sentPackets.Find(sequence)
+			sentPacketData := e.SentPackets.Find(sequence)
 			if sentPacketData == nil {
 				continue
 			}
@@ -365,14 +362,14 @@ func (e *Endpoint) Update(time float64) {
 
 	// calculate acked bandwidth
 	{
-		baseSequence := (int(e.sentPackets.Sequence) - e.config.SentPacketsBufferSize + 1) + 0xFFFF
+		baseSequence := (int(e.SentPackets.Sequence) - e.config.SentPacketsBufferSize + 1) + 0xFFFF
 		var bytesSent int
 		startTime := math.MaxFloat64
 		var finishTime float64
 		numSamples := e.config.ReceivedPacketsBufferSize / 2
 		for i := 0; i < numSamples; i++ {
 			sequence := uint16(baseSequence + i)
-			sentPacketData := e.sentPackets.Find(sequence)
+			sentPacketData := e.SentPackets.Find(sequence)
 			if sentPacketData == nil || sentPacketData.Acked == 0 {
 				continue
 			}
