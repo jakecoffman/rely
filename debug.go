@@ -3,5 +3,5 @@
 package rely
 
 func debugf(s string, args... interface{}) {
-	log.Debugf(s, args)
+	log.Debugf(s, args...)
 }

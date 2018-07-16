@@ -32,8 +32,9 @@ var incoming = make(chan []byte, 1000)
 type entry struct {
 	data []byte
 	time float64
+	index int
 }
-var packetData = map[uint16]entry{}
+var packetHistory = map[uint16]entry{}
 
 func main() {
 	const bufferSize = packetByteSize + rely.MaxPacketHeaderBytes
@@ -48,6 +49,7 @@ func main() {
 	config.Name = *name
 	config.TransmitPacketFunction = transmitPacket
 	config.ProcessPacketFunction = processPacket
+	config.RttSmoothingFactor = 1 // show RTT of the last acked packet instead of hiding it behind smoothing
 
 	var err error
 	if config.Name == "server" {
@@ -119,17 +121,15 @@ func main() {
 		// clear the stored packets that have been acked
 		acks := endpoint.GetAcks()
 		for _, sequence := range acks {
-			delete(packetData, sequence)
+			delete(packetHistory, sequence)
 		}
 		endpoint.ClearAcks()
 
 		// resend packets that haven't been acked in over 150ms
-		for sequence, entry := range packetData {
+		for sequence, entry := range packetHistory {
 			if t - entry.time > .15 {
 				fmt.Println("Resending packet", sequence)
-				endpoint.SendPacket(entry.data)
-				// since resent packets get new sequence, delete
-				delete(packetData, sequence)
+				transmitPacket(nil, entry.index, sequence, entry.data)
 			}
 		}
 
@@ -137,7 +137,6 @@ func main() {
 		sequence := endpoint.NextPacketSequence()
 		data := generatePacketData(sequence, make([]byte, packetByteSize))
 		endpoint.SendPacket(data)
-		packetData[sequence] = entry{time: t, data: data}
 
 		sent, recved, acked := endpoint.Bandwidth()
 		fmt.Printf("%v sent | %v received | %v acked | rtt = %vms | packet loss = %v%% | sent = %vkbps | recv = %vkbps | acked = %vkbps\n",
@@ -154,9 +153,11 @@ func main() {
 	}
 }
 
-func transmitPacket(_ interface{}, index int, _ uint16, packetData []byte) {
+func transmitPacket(_ interface{}, index int, sequence uint16, packetData []byte) {
 	var n int
 	var err error
+
+	packetHistory[sequence] = entry{time: now(), data: packetData, index: index}
 
 	if rand.Intn(100) == 0 {
 		// 1% packet loss

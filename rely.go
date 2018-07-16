@@ -171,7 +171,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 					ackSequence := ack - uint16(i)
 					sentPacketData := e.sentPackets.Find(ackSequence)
 					if sentPacketData != nil && sentPacketData.Acked == 0 && len(e.acks) + 1 < e.config.AckBufferSize {
-						debugf("[%s] acked packet %d", e.config.Name, sequence)
+						debugf("[%s] acked packet %d", e.config.Name, ackSequence)
 						e.acks = append(e.acks, ackSequence)
 						e.counters[counterNumPacketsAcked]++
 						sentPacketData.Acked = 1
