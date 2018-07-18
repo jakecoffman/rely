@@ -2,7 +2,7 @@
 
 port of reliable.io to Go
 
-[godoc](https://godoc.org/github.com/jakecoffman/rely)
+[![GoDoc](https://godoc.org/github.com/jakecoffman/rely?status.svg)](http://godoc.org/github.com/jakecoffman/rely) [![Build Status](https://travis-ci.org/jakecoffman/rely.svg?branch=master)](https://travis-ci.org/jakecoffman/rely)
 
 # performance
 
