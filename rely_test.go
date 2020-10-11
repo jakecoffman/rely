@@ -1,8 +1,8 @@
 package rely
 
 import (
-	"testing"
 	"github.com/op/go-logging"
+	"testing"
 )
 
 func TestPacketHeader(t *testing.T) {
@@ -129,8 +129,8 @@ func TestAcks(t *testing.T) {
 
 	deltaTime := 0.01
 
-	for i := 0; i < testAcksNumIterations; i ++ {
-		dummyPacket := []byte{1, 2, 3, 4, 5, 6, 7, 8,}
+	for i := 0; i < testAcksNumIterations; i++ {
+		dummyPacket := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 
 		context.sender.SendPacket(dummyPacket)
 		context.receiver.SendPacket(dummyPacket)
@@ -237,7 +237,7 @@ func TestAcksPacketLoss(t *testing.T) {
 const testMaxPacketBytes = 4 * 1024
 
 func generatePacketData(sequence uint16) []byte {
-	packetBytes := ((int(sequence)*1023) % (testMaxPacketBytes - 2)) + 2
+	packetBytes := ((int(sequence) * 1023) % (testMaxPacketBytes - 2)) + 2
 	if packetBytes < 2 || packetBytes > testMaxPacketBytes {
 		log.Fatal("failed to gen packetBytes", packetBytes)
 	}
@@ -245,7 +245,7 @@ func generatePacketData(sequence uint16) []byte {
 	packetData[0] = byte(sequence & 0xFF)
 	packetData[1] = byte((sequence >> 8) & 0xFF)
 	for i := 2; i < packetBytes; i++ {
-		packetData[i] = byte((i+int(sequence))%256)
+		packetData[i] = byte((i + int(sequence)) % 256)
 	}
 	return packetData
 }

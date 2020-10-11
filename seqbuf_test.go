@@ -22,7 +22,7 @@ func TestSequenceBuffer_Find(t *testing.T) {
 	for i := 0; i <= testSequenceBufferSize*4; i++ {
 		entry := sb.Insert(uint16(i))
 		if entry == nil {
-			t.Error("Failed to insert entry")
+			t.Fatal("Failed to insert entry")
 		}
 		entry.Sequence = uint16(i)
 		if int(sb.Sequence) != i+1 {
@@ -38,10 +38,10 @@ func TestSequenceBuffer_Find(t *testing.T) {
 	}
 
 	index := testSequenceBufferSize * 4
-	for i := 0; i< testSequenceBufferSize; i++ {
+	for i := 0; i < testSequenceBufferSize; i++ {
 		entry := sb.Find(uint16(index))
 		if entry == nil {
-			t.Error("Shouldn't have been nil", i)
+			t.Fatal("Shouldn't have been nil", i)
 		}
 		if entry.Sequence != uint16(index) {
 			t.Error("Entry", i, "at index", index, "not equal", entry.Sequence)
@@ -86,7 +86,7 @@ func TestSequenceBuffer_GenerateAckBits(t *testing.T) {
 
 	sb.GenerateAckBits(&ack, &ackBits)
 
-	if ack != 11 || ackBits != ( 1 | (1<<(11-9)) | (1<<(11-5)) | (1<<(11-1)) ) {
+	if ack != 11 || ackBits != (1|(1<<(11-9))|(1<<(11-5))|(1<<(11-1))) {
 		t.Error("Failed to generate ack bits", ack, ackBits)
 	}
 }

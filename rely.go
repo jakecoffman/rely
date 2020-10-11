@@ -170,13 +170,13 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 				if ackBits&1 != 0 {
 					ackSequence := ack - uint16(i)
 					sentPacketData := e.sentPackets.Find(ackSequence)
-					if sentPacketData != nil && sentPacketData.Acked == 0 && len(e.acks) + 1 < e.config.AckBufferSize {
+					if sentPacketData != nil && sentPacketData.Acked == 0 && len(e.acks)+1 < e.config.AckBufferSize {
 						debugf("[%s] acked packet %d", e.config.Name, ackSequence)
 						e.acks = append(e.acks, ackSequence)
 						e.counters[counterNumPacketsAcked]++
 						sentPacketData.Acked = 1
 
-						rtt := float64(e.time-sentPacketData.Time) * 1000
+						rtt := (e.time - sentPacketData.Time) * 1000
 						if e.rtt == 0 && rtt > 0 || math.Abs(e.rtt-rtt) < 0.00001 {
 							e.rtt = rtt
 						} else {
@@ -219,7 +219,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 			reassemblyData.FragmentReceived = [256]uint8{}
 		}
 
-		if numFragments != int(reassemblyData.NumFragmentsTotal) {
+		if numFragments != reassemblyData.NumFragmentsTotal {
 			log.Errorf("[%s] ignoring invalid fragment. fragment count mismatch. expected %d, got %d", e.config.Name, reassemblyData.NumFragmentsTotal, numFragments)
 			e.counters[counterNumFragmentsInvalid]++
 			return
@@ -237,7 +237,7 @@ func (e *Endpoint) ReceivePacket(packetData []byte) {
 
 		if reassemblyData.NumFragmentsReceived == reassemblyData.NumFragmentsTotal {
 			debugf("[%s] completed reassembly of packet %d", e.config.Name, sequence)
-			e.ReceivePacket(reassemblyData.PacketData[MaxPacketHeaderBytes-reassemblyData.PacketHeaderBytes:MaxPacketHeaderBytes+reassemblyData.PacketBytes])
+			e.ReceivePacket(reassemblyData.PacketData[MaxPacketHeaderBytes-reassemblyData.PacketHeaderBytes : MaxPacketHeaderBytes+reassemblyData.PacketBytes])
 			e.free(reassemblyData.PacketData)
 			e.fragmentReassembly.Remove(sequence)
 		}
@@ -429,15 +429,15 @@ func writePacketHeader(packetData *buffer, sequence, ack uint16, ackBits uint32)
 		prefixByte |= 1 << 1
 	}
 
-	if (ackBits & 0x0000FF00 ) != 0x0000FF00 {
+	if (ackBits & 0x0000FF00) != 0x0000FF00 {
 		prefixByte |= 1 << 2
 	}
 
-	if (ackBits & 0x00FF0000 ) != 0x00FF0000 {
+	if (ackBits & 0x00FF0000) != 0x00FF0000 {
 		prefixByte |= 1 << 3
 	}
 
-	if (ackBits & 0xFF000000 ) != 0xFF000000 {
+	if (ackBits & 0xFF000000) != 0xFF000000 {
 		prefixByte |= 1 << 4
 	}
 
@@ -613,11 +613,11 @@ func lessThan(s1, s2 uint16) bool {
 }
 
 func greaterThan(s1, s2 uint16) bool {
-	return ( ( s1 > s2 ) && ( s1-s2 <= 32768 ) ) || ( ( s1 < s2 ) && ( s2-s1 > 32768 ) )
+	return ((s1 > s2) && (s1-s2 <= 32768)) || ((s1 < s2) && (s2-s1 > 32768))
 }
 
 const (
-	counterNumPacketsSent              = iota
+	counterNumPacketsSent = iota
 	counterNumPacketsReceived
 	counterNumPacketsAcked
 	counterNumPacketsStale

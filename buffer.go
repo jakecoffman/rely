@@ -52,7 +52,7 @@ func (b *buffer) getUint8() (uint8, error) {
 	if err != nil {
 		return 0, nil
 	}
-	return uint8(buf[0]), nil
+	return buf[0], nil
 }
 
 func (b *buffer) getUint16() (uint16, error) {
@@ -71,7 +71,7 @@ func (b *buffer) writeBytes(src []byte) {
 }
 
 func (b *buffer) writeUint8(n uint8) {
-	b.buf[b.pos] = byte(n)
+	b.buf[b.pos] = n
 	b.pos++
 }
 
