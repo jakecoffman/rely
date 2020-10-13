@@ -1,6 +1,6 @@
 # rely
 
-port of reliable.io to Go
+port of https://github.com/networkprotocol/reliable to Go
 
 [![GoDoc](https://godoc.org/github.com/jakecoffman/rely?status.svg)](http://godoc.org/github.com/jakecoffman/rely) [![Build Status](https://travis-ci.org/jakecoffman/rely.svg?branch=master)](https://travis-ci.org/jakecoffman/rely)
 
